@@ -11,6 +11,8 @@ export interface StageCtrl {
   openStart: number;
   /** 当前装置的立起程度 0..1，供外部读取 */
   rigU: number;
+  /** Whether the camera should inspect the apparatus at close range. */
+  closeUp: boolean;
   /** 翻页前装置的立起程度，用于折回动画的连续性 */
   fallFrom: number;
   /** 叶片当前根部角度，供外部读取 */
@@ -28,6 +30,7 @@ export const makeCtrl = (): StageCtrl => ({
   fracTarget: 0,
   openStart: performance.now(),
   rigU: 0,
+  closeUp: false,
   fallFrom: 1,
   heights: { tL: 0.1, tR: 0.4 },
 });

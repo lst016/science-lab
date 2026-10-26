@@ -5,9 +5,10 @@ import type { Experiment } from '../data/types';
 import { rt } from '../state/runtime';
 import { FLIP_MS, OPEN_MS, SWAP_MS, StageCtrl } from './ctrl';
 import { PAGE_H, PAGE_W, createLeaf, createPageBlock, pageTopAt, updateLeaf, updatePageBlock } from './bookGeometry';
-import { coverTexture, edgeTexture, folioTexture, leatherTexture, paperTexture } from './textures';
+import { coverTexture, deskTexture, edgeTexture, folioTexture, leatherTexture, matTexture, paperTexture } from './textures';
 import { solveHomography, toMatrix3d } from './homography';
 import { RigRouter } from './rigs';
+import { InkScene } from './InkScene';
 
 export type StageMode = 'spread' | 'stack';
 
@@ -18,6 +19,32 @@ const easeOutBack = (t: number) => {
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 };
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+/** 芥末黄薄封皮 */
+const MUSTARD = '#d6a420';
+const MAT_W = 21;
+const MAT_D = 12;
+
+/** 圆角桌垫（顶面 y=0，向下 0.04 厚；UV 为世界坐标，贴图按 2 单位一格平铺） */
+function createDeskMat(): THREE.ExtrudeGeometry {
+  const w = MAT_W / 2;
+  const d = MAT_D / 2;
+  const r = 0.7;
+  const sh = new THREE.Shape();
+  sh.moveTo(-w + r, -d);
+  sh.lineTo(w - r, -d);
+  sh.quadraticCurveTo(w, -d, w, -d + r);
+  sh.lineTo(w, d - r);
+  sh.quadraticCurveTo(w, d, w - r, d);
+  sh.lineTo(-w + r, d);
+  sh.quadraticCurveTo(-w, d, -w, d - r);
+  sh.lineTo(-w, -d + r);
+  sh.quadraticCurveTo(-w, -d, -w + r, -d);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.04, bevelEnabled: false });
+  g.rotateX(-Math.PI / 2); // 挤出方向 +z → +y
+  g.translate(0, -0.04, 0);
+  return g;
+}
 
 /** 指针倾斜（窗口级，避免被左页 DOM 遮挡） */
 const tilt = { x: 0, y: 0, cx: 0, cy: 0 };
@@ -36,6 +63,7 @@ interface SceneProps {
 function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomPad }: SceneProps) {
   const { camera, gl, size, invalidate } = useThree();
   const cam = camera as THREE.PerspectiveCamera;
+  const inspection = useRef(0);
 
   /* ---------- 材质与几何（一次创建） ---------- */
   const res = useMemo(() => {
@@ -43,8 +71,12 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
     const paperR = paperTexture('right', 3);
     const paperL = paperTexture('left', 5);
     const edge = edgeTexture();
-    const leather = leatherTexture('#8e5a2b');
-    for (const t of [paperR, paperL, edge, leather]) t.anisotropy = Math.min(8, maxAniso);
+    const leather = leatherTexture(MUSTARD);
+    const desk = deskTexture();
+    desk.repeat.set(10, 10);
+    const mat = matTexture();
+    mat.repeat.set(0.5, 0.5);
+    for (const t of [paperR, paperL, edge, leather, desk, mat]) t.anisotropy = Math.min(8, maxAniso);
     return {
       paperR,
       paperL,
@@ -53,12 +85,15 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
       blockL: createPageBlock(-1),
       blockR: createPageBlock(),
       leaf: createLeaf(),
-      matPaperR: new THREE.MeshStandardMaterial({ map: paperR, roughness: 0.92, metalness: 0, side: THREE.DoubleSide }),
-      matPaperL: new THREE.MeshStandardMaterial({ map: paperL, roughness: 0.92, metalness: 0, side: THREE.DoubleSide }),
+      matPaperR: new THREE.MeshStandardMaterial({ map: paperR, roughness: 0.96, metalness: 0, side: THREE.DoubleSide }),
+      matPaperL: new THREE.MeshStandardMaterial({ map: paperL, roughness: 0.96, metalness: 0, side: THREE.DoubleSide }),
       matEdge: new THREE.MeshStandardMaterial({ map: edge, roughness: 1, side: THREE.DoubleSide }),
       matLeaf: new THREE.MeshStandardMaterial({ map: paperR, roughness: 0.9, side: THREE.DoubleSide }),
-      matLeather: new THREE.MeshStandardMaterial({ map: leather, roughness: 0.78, metalness: 0.02 }),
-      matEndpaper: new THREE.MeshStandardMaterial({ color: '#e7d6ae', roughness: 0.95 }),
+      matLeather: new THREE.MeshStandardMaterial({ map: leather, roughness: 0.82, metalness: 0 }),
+      matEndpaper: new THREE.MeshStandardMaterial({ color: '#f1eee4', roughness: 0.95 }),
+      matDesk: new THREE.MeshStandardMaterial({ map: desk, roughness: 0.9, metalness: 0 }),
+      matDeskMat: new THREE.MeshStandardMaterial({ map: mat, roughness: 1, metalness: 0 }),
+      deskMatGeo: createDeskMat(),
     };
   }, [gl]);
 
@@ -76,8 +111,10 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
   );
   const folioTex = useMemo(
     () => folioTexture([
-      { text: indexLabel, x: 440, y: 596, size: 22, align: 'right' },
-      { text: exp.chapter.length > 14 ? exp.chapter.slice(0, 14) + '…' : exp.chapter, x: 70, y: 596, size: 20 },
+      { text: indexLabel, x: 440, y: 596, size: 16, align: 'right' },
+      { text: `图 ${indexLabel.split('/')[0].trim()} · ${exp.title.slice(0, 23)}`, x: 62, y: 470, size: 15 },
+      { text: '调整左页参数，观察现象怎样变化。', x: 62, y: 501, size: 15 },
+      { text: exp.chapter.length > 14 ? exp.chapter.slice(0, 14) + '…' : exp.chapter, x: 62, y: 596, size: 13 },
     ], 'right'),
     [exp.id, indexLabel, exp.chapter],
   );
@@ -120,7 +157,7 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
 
   /* ---------- 相机拟合 ---------- */
   const fit = (el: number, az: number) => {
-    const target = mode === 'spread' ? new THREE.Vector3(0, 0.4, 0.15) : new THREE.Vector3(PAGE_W / 2, 0.9, 0.1);
+    const target = mode === 'spread' ? new THREE.Vector3(0.2, 0.8, -0.15) : new THREE.Vector3(PAGE_W / 2, 0.9, 0.1);
     const pts: THREE.Vector3[] = [];
     const bw = PAGE_W + 0.2;
     const bh = PAGE_H / 2 + 0.2;
@@ -129,7 +166,7 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
     pts.push(new THREE.Vector3(PAGE_W / 2 - 2.3, rigTop, -1.8), new THREE.Vector3(PAGE_W / 2 + 2.3, rigTop, -1.8));
     const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
     const ml = 0.04;
-    const mt = mode === 'spread' ? 0.1 : 0.04;
+    const mt = mode === 'spread' ? 0.12 : 0.04; // 顶部留出桌面
     const mb = (bottomPad / size.height) * 2 + 0.02;
     let lo = 4;
     let hi = 120;
@@ -149,7 +186,7 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
     return { dist: hi, target };
   };
 
-  const EL = (mode === 'spread' ? 56 : 58) * (Math.PI / 180);
+  const EL = (mode === 'spread' ? 45 : 56) * (Math.PI / 180);
 
   useFrame((state, dt) => {
     const now = performance.now();
@@ -244,11 +281,21 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
     tilt.cx += (tilt.x - tilt.cx) * Math.min(1, dt * 4);
     tilt.cy += (tilt.y - tilt.cy) * Math.min(1, dt * 4);
     if (Math.abs(tilt.x - tilt.cx) + Math.abs(tilt.y - tilt.cy) > 0.002) animating = true;
+    const composition = mode === 'spread' ? clamp01((size.width / size.height - 1.2) / 0.55) : 0;
     const az = tilt.cx * 0.07;
     const el = EL + (mode === 'spread' ? -tilt.cy * 0.045 : -tilt.cy * 0.03);
     const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
-    cam.position.copy(fitInfo.target).addScaledVector(dir, D.current * zoom);
-    cam.lookAt(fitInfo.target);
+    cam.position.copy(fitInfo.target).addScaledVector(dir, D.current * zoom * (1 - 0.18 * composition));
+    const focus = ctrl.closeUp ? 1 : 0;
+    inspection.current = THREE.MathUtils.damp(inspection.current, focus, 4.5, dt);
+    if (Math.abs(inspection.current - focus) > 0.001) animating = true;
+    const target = new THREE.Vector3(fitInfo.target.x + composition * 0.25, fitInfo.target.y + composition * 0.1, fitInfo.target.z);
+    const detailTarget = new THREE.Vector3(PAGE_W / 2, 1.65, 0);
+    const detailDir = new THREE.Vector3(-0.12, 0.68, 0.72).normalize();
+    const detailPosition = detailTarget.clone().addScaledVector(detailDir, D.current * (mode === 'spread' ? 0.55 : 0.78));
+    cam.position.lerp(detailPosition, inspection.current);
+    target.lerp(detailTarget, inspection.current);
+    cam.lookAt(target);
     cam.updateMatrixWorld();
 
     /* 左页 DOM 单应变换 */
@@ -281,48 +328,50 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
     }
   });
 
-  const boardW = PAGE_W + 0.16;
-  const boardH = PAGE_H + 0.26;
+  const boardW = PAGE_W + 0.2;
+  const boardH = PAGE_H + 0.32;
+  const BT = 0.09; // 封皮厚度
 
   return (
     <>
-      <hemisphereLight args={['#fff6e2', '#7d8a6c', 0.85]} />
+      <hemisphereLight args={['#f3f5ff', '#a3a89a', 1.3]} />
+      {/* 侧上方自然日光：自左后方斜照，影子落向右前，边缘柔和 */}
       <directionalLight
-        position={[-5, 13, 8]}
-        intensity={2.3}
-        color="#fff1d6"
+        position={[-8, 12, -3]}
+        intensity={1.75}
+        color="#fff2dc"
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-11}
-        shadow-camera-right={11}
-        shadow-camera-top={10}
-        shadow-camera-bottom={-10}
+        shadow-camera-left={-13}
+        shadow-camera-right={13}
+        shadow-camera-top={12}
+        shadow-camera-bottom={-12}
         shadow-camera-near={1}
-        shadow-camera-far={40}
+        shadow-camera-far={44}
         shadow-bias={-0.0004}
         shadow-normalBias={0.03}
-        shadow-radius={5}
+        shadow-radius={8}
       />
-      <directionalLight position={[8, 6, -4]} intensity={0.35} color="#dfe8ff" />
+      <directionalLight position={[7, 6, 8]} intensity={0.55} color="#e6edff" />
 
-      {/* 桌面阴影接收 */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, -0.16, 0]} receiveShadow>
-        <planeGeometry args={[60, 40]} />
-        <shadowMaterial opacity={0.28} />
+      {/* 木纹桌面 + 灰绿桌垫（接收投影） */}
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.16, 0]} receiveShadow material={res.matDesk}>
+        <planeGeometry args={[120, 80]} />
       </mesh>
+      <mesh geometry={res.deskMatGeo} material={res.matDeskMat} position={[0, -BT, -0.3]} receiveShadow />
 
       {/* 封面底板与书脊 */}
-      <mesh ref={boardL} position={[-boardW / 2 + 0.02, -0.07, 0]} receiveShadow castShadow>
-        <boxGeometry args={[boardW, 0.14, boardH]} />
+      <mesh ref={boardL} position={[-boardW / 2 + 0.02, -BT / 2, 0]} receiveShadow castShadow>
+        <boxGeometry args={[boardW, BT, boardH]} />
         <primitive object={res.matLeather} attach="material" />
       </mesh>
-      <mesh position={[boardW / 2 - 0.02, -0.07, 0]} receiveShadow castShadow>
-        <boxGeometry args={[boardW, 0.14, boardH]} />
+      <mesh position={[boardW / 2 - 0.02, -BT / 2, 0]} receiveShadow castShadow>
+        <boxGeometry args={[boardW, BT, boardH]} />
         <primitive object={res.matLeather} attach="material" />
       </mesh>
-      <mesh position={[0, -0.09, 0]} receiveShadow>
-        <boxGeometry args={[0.36, 0.14, boardH]} />
-        <meshStandardMaterial color="#6f4320" roughness={0.8} />
+      <mesh position={[0, -BT / 2 - 0.005, 0]} receiveShadow>
+        <boxGeometry args={[0.4, BT, boardH]} />
+        <meshStandardMaterial color="#c4931a" roughness={0.85} />
       </mesh>
 
       {/* 左右书页 */}
@@ -337,8 +386,8 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
 
       {/* 开书的封面 */}
       <group ref={lid} position={[0, 0.4, 0]}>
-        <mesh position={[boardW / 2 - 0.02, 0.07, 0]} material={lidMats} castShadow>
-          <boxGeometry args={[boardW, 0.14, boardH]} />
+        <mesh position={[boardW / 2 - 0.02, BT / 2, 0]} material={lidMats} castShadow>
+          <boxGeometry args={[boardW, BT, boardH]} />
         </mesh>
       </group>
 
@@ -349,6 +398,9 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
       <group ref={rigGroup}>
         <RigRouter exp={exp} />
       </group>
+
+      {/* 手绘器材 */}
+      <InkScene />
     </>
   );
 }
@@ -377,8 +429,8 @@ export function BookStage(props: BookStageProps) {
       gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
       onCreated={({ gl }) => {
         gl.setClearColor(0x000000, 0);
-        gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.05;
+        gl.toneMapping = THREE.NeutralToneMapping; // 保住白纸而不泛灰
+        gl.toneMappingExposure = 1;
         gl.shadowMap.type = THREE.PCFShadowMap;
       }}
     >

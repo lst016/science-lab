@@ -1,6 +1,7 @@
 import { usePlaying } from '../state/runtime';
 
 const I = {
+  inspect: <path d="M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12M14.5 14.5 21 21M10 7v6M7 10h6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />,
   lib: <path d="M5 4h3v16H5zM10 4h3v16h-3zM15.2 5.4l2.8-.8 3.2 14.8-2.8.8z" />,
   toc: <path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />,
   prev: <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />,
@@ -13,7 +14,7 @@ const Icon = ({ k }: { k: keyof typeof I }) => (<svg viewBox="0 0 24 24" width="
 
 export function Toolbar(props: {
   index: number; total: number; onLibrary: () => void; onToc: () => void; onPrev: () => void; onNext: () => void;
-  onTogglePlay: () => void; onReset: () => void; tocOpen: boolean;
+  onTogglePlay: () => void; onInspect: () => void; closeUp: boolean; canInspect: boolean; onReset: () => void; tocOpen: boolean;
 }) {
   const playing = usePlaying();
   const { index, total } = props;
@@ -26,6 +27,7 @@ export function Toolbar(props: {
       <span className="pager" aria-live="polite">{String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
       <button type="button" onClick={props.onNext} disabled={index >= total - 1} aria-label="下一个实验" title="下一页（→）"><Icon k="next" /></button>
       <i className="sep" />
+      <button type="button" onClick={props.onInspect} disabled={!props.canInspect} aria-pressed={props.closeUp} title={props.closeUp ? '返回全书视角' : '近看实验装置'}><Icon k="inspect" /><span>{props.closeUp ? '全景' : '近看'}</span></button>
       <button type="button" onClick={props.onTogglePlay} aria-pressed={playing} title="播放 / 暂停（空格）"><Icon k={playing ? 'pause' : 'play'} /><span>{playing ? '暂停' : '播放'}</span></button>
       <button type="button" onClick={props.onReset} title="重置所有参数与时间"><Icon k="reset" /><span>重置</span></button>
     </nav>

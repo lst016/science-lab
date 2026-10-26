@@ -179,11 +179,11 @@ export function labelTexture(text: string, color: string, bg: string) {
   const c = document.createElement('canvas');
   const g = c.getContext('2d')!;
   const fs = 44;
-  g.font = `600 ${fs}px "PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif`;
+  g.font = `500 ${fs}px "Songti SC","STSong","Noto Serif CJK SC",serif`;
   const w = Math.ceil(g.measureText(text).width) + 36;
   c.width = w;
   c.height = fs + 26;
-  g.font = `600 ${fs}px "PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif`;
+  g.font = `500 ${fs}px "Songti SC","STSong","Noto Serif CJK SC",serif`;
   g.fillStyle = bg;
   const rr = 18;
   g.beginPath();
@@ -198,7 +198,7 @@ export function labelTexture(text: string, color: string, bg: string) {
   labelCache.set(key, t);
   return t;
 }
-export function Label({ text, p = [0, 0, 0], size = 0.28, color = '#3a2e20', bg = 'rgba(255,250,235,0.9)' }: { text: string; p?: V3; size?: number; color?: string; bg?: string }) {
+export function Label({ text, p = [0, 0, 0], size = 0.28, color = '#3a2e20', bg = 'rgba(255,255,255,0)' }: { text: string; p?: V3; size?: number; color?: string; bg?: string }) {
   const tex = useMemo(() => labelTexture(text, color, bg), [text, color, bg]);
   const img = tex.image as HTMLCanvasElement;
   const aspect = img.width / img.height;
@@ -210,7 +210,7 @@ export function Label({ text, p = [0, 0, 0], size = 0.28, color = '#3a2e20', bg 
 }
 
 /** 随观察值刷新的标签：只在文字变化时重绘贴图 */
-export function LiveLabel({ get, p = [0, 0, 0], size = 0.3, color = '#183018', bg = 'rgba(245,252,236,0.95)' }: { get: (o: Observation) => string; p?: V3; size?: number; color?: string; bg?: string }) {
+export function LiveLabel({ get, p = [0, 0, 0], size = 0.3, color = '#183018', bg = 'rgba(255,255,255,0)' }: { get: (o: Observation) => string; p?: V3; size?: number; color?: string; bg?: string }) {
   const sprite = useRef<THREE.Sprite>(null);
   const last = useRef('');
   useObs((o) => {

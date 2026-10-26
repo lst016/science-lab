@@ -145,7 +145,7 @@ export function Speaker({ p = [0, 0, 0], rot, ampRef, size = 1 }: { p?: V3; rot?
 }
 
 /** 由 io 驱动的文字标签：文字变化时才重绘贴图。 */
-export function IoLabel({ get, p = [0, 0, 0], size = 0.3, color = '#183018', bg = 'rgba(245,252,236,0.95)' }: { get: (io: RigIO) => string; p?: V3; size?: number; color?: string; bg?: string }) {
+export function IoLabel({ get, p = [0, 0, 0], size = 0.3, color = '#183018', bg = 'rgba(255,255,255,0)' }: { get: (io: RigIO) => string; p?: V3; size?: number; color?: string; bg?: string }) {
   const sprite = useRef<THREE.Sprite>(null);
   const last = useRef('');
   useRig((io) => {

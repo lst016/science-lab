@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import type { Experiment } from '../../data/types';
-import { Label, Stage } from '../kit';
+import { Label } from '../kit';
 import { SoundRig } from './sound';
 import { ElectricRig, MagnetismRig } from './electric-rigs';
 import { ChemicalRig } from './chemical-rigs';
@@ -32,8 +32,7 @@ export function RigRouter({ exp }: { exp: Experiment }) {
     ? <ChemicalRig exp={exp} />
     : route ? route(exp) : null;
   return (
-    <group key={exp.id}>
-      <Stage />
+    <group key={exp.id} name="experiment-rig">
       <group position={[0, 0.07, 0]}>
         {content ?? <Label text={`「${exp.sceneVariant}」暂无专属 3D 装置`} p={[0, 1, 0]} />}
       </group>

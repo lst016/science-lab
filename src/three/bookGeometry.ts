@@ -4,7 +4,11 @@ export const PAGE_W = 6;
 export const PAGE_H = 7.4;
 const N = 22; // 沿宽度分段
 
-const dipAt = (d: number, t: number) => Math.min(0.2, t * 0.7) * Math.exp(-Math.pow(d / 1.15, 1.6));
+// 中缝：紧贴装订线的窄折痕 + 向外缓缓抬起的宽弧，页面柔软自然下弯
+const dipAt = (d: number, t: number) => {
+  const k = Math.min(0.24, t * 0.62);
+  return k * (0.62 * Math.exp(-Math.pow(d / 1.7, 1.45)) + 0.38 * Math.exp(-Math.pow(d / 0.42, 1.2)));
+};
 
 /** 一摞书页（单侧）：顶面带书脊下陷曲线，侧面是页缘。分组 0=顶面，1=侧面。 */
 export function createPageBlock(side: 1 | -1 = 1): THREE.BufferGeometry {

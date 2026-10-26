@@ -96,6 +96,7 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
   const [shown, setShown] = useState<Experiment>(target);
   const [fading, setFading] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
+  const [closeUp, setCloseUp] = useState(false);
   const leftEl = useRef<HTMLDivElement>(null);
   const tocBtnFocus = useRef<HTMLElement | null>(null);
 
@@ -118,6 +119,8 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
     shownRef.current = next;
     setShown(next);
     loadExperiment(next);
+    ctrl.current.closeUp = false;
+    setCloseUp(false);
     swapped.current = true;
     ctrl.current.swapAt = performance.now();
     ctrl.current.fracTarget = fracOf(exps.indexOf(next));
@@ -208,7 +211,8 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
       const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t?.isContentEditable;
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
       if (tocOpen) return;
-      if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(targetIndex - 1); }
+      if (e.key === 'Escape') { ctrl.current.closeUp = false; setCloseUp(false); rt.invalidate(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(targetIndex - 1); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); goTo(targetIndex + 1); }
       else if (e.key === ' ' && (tag === 'BODY' || tag === 'CANVAS')) { e.preventDefault(); setPlaying(!rt.playing); }
       else if (e.key.toLowerCase() === 'l') { setTocOpen(true); }
@@ -227,7 +231,7 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
   const cover = useMemo(() => ({ color: cs.color, title: book.subject === 'physics' ? '物理' : '化学', sub: `${book.grade}${book.volume}` }), [cs.color, book]);
 
   return (
-    <div className={`reader desk mode-${mode}${useGL ? '' : ' nogl'}`} style={{ ['--bookc' as string]: cs.color }}>
+    <div className={`reader desk mode-${mode}${useGL ? '' : ' nogl'}${closeUp ? ' is-inspecting' : ''}`} style={{ ['--bookc' as string]: cs.color }}>
       <div className="book-label" aria-hidden>{book.title}</div>
       <div className="stage">
         {useGL ? (
@@ -264,6 +268,9 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
         onToc={openToc}
         onPrev={prev}
         onNext={next}
+        canInspect={useGL}
+        closeUp={closeUp}
+        onInspect={() => { ctrl.current.closeUp = !closeUp; setCloseUp(!closeUp); rt.invalidate(); }}
         onTogglePlay={() => setPlaying(!rt.playing)}
         onReset={resetExperiment}
       />
