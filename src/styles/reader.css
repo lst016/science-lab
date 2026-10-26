@@ -147,7 +147,7 @@
 .empty-card { position: relative; z-index: 3; background: #f8f1de; padding: 32px 40px; border-radius: 6px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); max-width: 480px; font-family: var(--serif); }
 .empty-card button { padding: 8px 18px; border-radius: 99px; border: 1px solid var(--accent); background: #fff; font-size: 14px; }
 
-/* ---- 窄屏 / 竖屏：上 3D 下文字，真实可操作 ---- */
+/* ---- 手机窄屏：上 3D 下文字；桌面竖窗仍贴在书页上 ---- */
 .mode-stack { display: grid; grid-template-rows: minmax(210px, 46svh) minmax(0, 1fr) auto; height: 100svh; }
 .mode-stack .stage { position: relative; inset: auto; grid-row: 1; }
 .mode-stack .left-host { grid-row: 2; position: relative; min-height: 0; overflow: hidden; background: #f8f1de; box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.22); border-top: 1px solid rgba(120, 90, 50, 0.4); transition: opacity 0.25s; }

@@ -80,7 +80,14 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
   const book = getBook(bookId)!;
   const cs = coverOf(book);
   const vp = useViewport();
-  const mode: StageMode = vp.w >= 1100 && vp.w / vp.h >= 1.35 ? 'spread' : 'stack';
+  // Desktop panels and tablets keep the text on the left paper, including
+  // square/tall windows. Only genuinely narrow screens use a stacked reader.
+  const mode: StageMode = vp.w >= 760 ? 'spread' : 'stack';
+  const spreadScale = Math.min(1, Math.max(360 / SPREAD_LAYOUT.w, vp.w / 1280));
+  const spreadLayout = {
+    w: Math.round(SPREAD_LAYOUT.w * spreadScale),
+    h: Math.round(SPREAD_LAYOUT.h * spreadScale),
+  };
   const [glOk] = useState(webglAvailable);
   const [glError, setGlError] = useState<string | null>(null);
   const useGL = glOk && !glError;
@@ -232,7 +239,7 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
               cover={cover}
               mode={mode}
               leftEl={leftEl}
-              layoutSize={SPREAD_LAYOUT}
+              layoutSize={spreadLayout}
               bottomPad={bottomPad}
               lowPower={lowPower}
             />
@@ -244,7 +251,7 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
       <div
         ref={leftEl}
         className={`left-host${fading ? ' fading' : ''}`}
-        style={mode === 'spread' && useGL ? { width: SPREAD_LAYOUT.w, height: SPREAD_LAYOUT.h } : undefined}
+        style={mode === 'spread' && useGL ? { width: spreadLayout.w, height: spreadLayout.h } : undefined}
         data-mode={mode}
       >
         <LeftPage key={shown.id} exp={shown} indexLabel={indexLabel} />
