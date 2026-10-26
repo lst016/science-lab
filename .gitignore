@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vite/
+*.log
+.DS_Store
+artifacts/
+
+docs/claude-*-stream.jsonl
+docs/claude-*-error.log
+docs/claude-*-result.json
+docs/claude-*-brief.md
