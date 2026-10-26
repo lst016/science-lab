@@ -9,3 +9,5 @@ docs/claude-*-stream.jsonl
 docs/claude-*-error.log
 docs/claude-*-result.json
 docs/claude-*-brief.md
+
+docs/claude-session-id.txt
