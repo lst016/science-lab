@@ -9,6 +9,7 @@ import { coverTexture, deskTexture, edgeTexture, folioTexture, leatherTexture, m
 import { solveHomography, toMatrix3d } from './homography';
 import { RigRouter } from './rigs';
 import { InkScene } from './InkScene';
+import { FitMargins, FitView, fitBestElevation, fitView, viewDir } from './cameraFit';
 
 export type StageMode = 'spread' | 'stack';
 
@@ -125,11 +126,11 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
   const leafMesh = useRef<THREE.Mesh>(null);
   const rigGroup = useRef<THREE.Group>(null);
   const boardL = useRef<THREE.Mesh>(null);
+  const pagesL = useRef<THREE.Mesh>(null);
   const folio = useRef<THREE.Mesh>(null);
   const fracCur = useRef(0);
-  const D = useRef(30);
   const lastFit = useRef('');
-  const fitRef = useRef<{ dist: number; target: THREE.Vector3 } | null>(null);
+  const fitRef = useRef<{ book: FitView; close: FitView } | null>(null);
   const tmp = useMemo(() => new THREE.Vector3(), []);
   const lastMatrix = useRef('');
   const settled = useRef(false);
@@ -156,37 +157,35 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
   const rigTop = 4.2;
 
   /* ---------- 相机拟合 ---------- */
-  const fit = (el: number, az: number) => {
-    const target = mode === 'spread' ? new THREE.Vector3(0.2, 0.8, -0.15) : new THREE.Vector3(PAGE_W / 2, 0.9, 0.1);
-    const pts: THREE.Vector3[] = [];
+  // 把全书（含装置顶部）的投影包围范围迭代居中到“可用区域”（扣掉底部工具栏），
+  // 不依赖固定 target 或额外 zoom。俯仰角在候选里选放大倍数最大者。
+  const fitAll = (): { book: FitView; close: FitView } => {
+    const aspect = size.width / Math.max(1, size.height);
     const bw = PAGE_W + 0.2;
     const bh = PAGE_H / 2 + 0.2;
-    const xs = mode === 'spread' ? [-bw, bw] : [-0.6, bw];
-    for (const x of xs) for (const z of [-bh, bh]) pts.push(new THREE.Vector3(x, 0, z));
-    pts.push(new THREE.Vector3(PAGE_W / 2 - 2.3, rigTop, -1.8), new THREE.Vector3(PAGE_W / 2 + 2.3, rigTop, -1.8));
-    const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
-    const ml = 0.04;
-    const mt = mode === 'spread' ? 0.12 : 0.04; // 顶部留出桌面
-    const mb = (bottomPad / size.height) * 2 + 0.02;
-    let lo = 4;
-    let hi = 120;
-    for (let i = 0; i < 28; i++) {
-      const mid = (lo + hi) / 2;
-      cam.position.copy(target).addScaledVector(dir, mid);
-      cam.lookAt(target);
-      cam.updateMatrixWorld();
-      cam.updateProjectionMatrix();
-      let ok = true;
-      for (const p of pts) {
-        tmp.copy(p).project(cam);
-        if (tmp.x < -1 + ml || tmp.x > 1 - ml || tmp.y > 1 - mt || tmp.y < -1 + mb) { ok = false; break; }
-      }
-      if (ok) hi = mid; else lo = mid;
+    const x0 = mode === 'spread' ? -bw : -0.3; // stack 只取右叶
+    const pts: THREE.Vector3[] = [];
+    for (const x of [x0, bw]) {
+      pts.push(new THREE.Vector3(x, -0.1, bh), new THREE.Vector3(x, 0.5, -bh), new THREE.Vector3(x, 0, bh), new THREE.Vector3(x, 0, -bh));
     }
-    return { dist: hi, target };
-  };
+    pts.push(new THREE.Vector3(PAGE_W / 2 - 2.3, rigTop, -1), new THREE.Vector3(PAGE_W / 2 + 2.3, rigTop, -1));
+    const margins: FitMargins = {
+      left: 0.035,
+      right: 0.035,
+      top: mode === 'spread' ? 0.05 : 0.03,
+      bottom: (bottomPad / Math.max(1, size.height)) * 2 + 0.02,
+    };
+    const els = (mode === 'spread' ? [40, 44, 48, 52, 56] : [52, 58, 64, 70]).map((d) => d * (Math.PI / 180));
+    const seed = mode === 'spread' ? new THREE.Vector3(0, 0.8, 0) : new THREE.Vector3(PAGE_W / 2, 0.9, 0);
+    const book = fitBestElevation(cam.fov, aspect, pts, seed, els, 0, margins, 0.015);
 
-  const EL = (mode === 'spread' ? 45 : 56) * (Math.PI / 180);
+    // 近看：装置的包围盒，固定斜俯视方向
+    const cx = PAGE_W / 2;
+    const box: THREE.Vector3[] = [];
+    for (const x of [cx - 2.5, cx + 2.5]) for (const y of [0, 4.2]) for (const z of [-1.6, 1.6]) box.push(new THREE.Vector3(x, y, z));
+    const close = fitView(cam.fov, aspect, box, new THREE.Vector3(cx, 1.65, 0), 0.75, -0.17, { ...margins, left: 0.06, right: 0.06, top: 0.08 });
+    return { book, close };
+  };
 
   useFrame((state, dt) => {
     const now = performance.now();
@@ -196,10 +195,11 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
     const key = `${size.width}x${size.height}|${mode}|${bottomPad}`;
     if (lastFit.current !== key || !fitRef.current) {
       lastFit.current = key;
-      fitRef.current = fit(EL, 0);
-      D.current = fitRef.current.dist;
+      fitRef.current = fitAll();
     }
     const fitInfo = fitRef.current;
+    if (boardL.current) boardL.current.visible = mode === 'spread';
+    if (pagesL.current) pagesL.current.visible = mode === 'spread';
 
     /* 开书动画 */
     const openP = clamp01((now - ctrl.openStart - 150) / (OPEN_MS - 150));
@@ -281,20 +281,17 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
     tilt.cx += (tilt.x - tilt.cx) * Math.min(1, dt * 4);
     tilt.cy += (tilt.y - tilt.cy) * Math.min(1, dt * 4);
     if (Math.abs(tilt.x - tilt.cx) + Math.abs(tilt.y - tilt.cy) > 0.002) animating = true;
-    const composition = mode === 'spread' ? clamp01((size.width / size.height - 1.2) / 0.55) : 0;
-    const az = tilt.cx * 0.07;
-    const el = EL + (mode === 'spread' ? -tilt.cy * 0.045 : -tilt.cy * 0.03);
-    const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
-    cam.position.copy(fitInfo.target).addScaledVector(dir, D.current * zoom * (1 - 0.18 * composition));
+    const { book, close } = fitInfo;
+    const az = book.az + (mode === 'spread' ? tilt.cx * 0.035 : 0);
+    const el = book.el + (mode === 'spread' ? -tilt.cy * 0.025 : 0);
+    cam.position.copy(book.target).addScaledVector(viewDir(el, az, tmp), book.dist * zoom);
     const focus = ctrl.closeUp ? 1 : 0;
     inspection.current = THREE.MathUtils.damp(inspection.current, focus, 4.5, dt);
     if (Math.abs(inspection.current - focus) > 0.001) animating = true;
-    const target = new THREE.Vector3(fitInfo.target.x + composition * 0.25, fitInfo.target.y + composition * 0.1, fitInfo.target.z);
-    const detailTarget = new THREE.Vector3(PAGE_W / 2, 1.65, 0);
-    const detailDir = new THREE.Vector3(-0.12, 0.68, 0.72).normalize();
-    const detailPosition = detailTarget.clone().addScaledVector(detailDir, D.current * (mode === 'spread' ? 0.55 : 0.78));
-    cam.position.lerp(detailPosition, inspection.current);
-    target.lerp(detailTarget, inspection.current);
+    const target = book.target.clone();
+    const closePos = close.target.clone().addScaledVector(viewDir(close.el, close.az, tmp), close.dist);
+    cam.position.lerp(closePos, inspection.current);
+    target.lerp(close.target, inspection.current);
     cam.lookAt(target);
     cam.updateMatrixWorld();
 
@@ -375,7 +372,7 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
       </mesh>
 
       {/* 左右书页 */}
-      <mesh geometry={res.blockL} receiveShadow castShadow material={[res.matPaperL, res.matEdge]} />
+      <mesh ref={pagesL} geometry={res.blockL} receiveShadow castShadow material={[res.matPaperL, res.matEdge]} />
       <mesh geometry={res.blockR} receiveShadow castShadow material={[res.matPaperR, res.matEdge]} />
 
       {/* 右页印刷页脚 */}

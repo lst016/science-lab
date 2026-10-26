@@ -82,7 +82,8 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
   const vp = useViewport();
   // Desktop panels and tablets keep the text on the left paper, including
   // square/tall windows. Only genuinely narrow screens use a stacked reader.
-  const mode: StageMode = vp.w >= 760 ? 'spread' : 'stack';
+  const landscapePhone = vp.w < 1000 && vp.h < 500;
+  const mode: StageMode = vp.w >= 760 && !landscapePhone ? 'spread' : 'stack';
   const spreadScale = Math.min(1, Math.max(360 / SPREAD_LAYOUT.w, vp.w / 1280));
   const spreadLayout = {
     w: Math.round(SPREAD_LAYOUT.w * spreadScale),
