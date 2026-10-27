@@ -1,8 +1,8 @@
-# 理化实验书
+# 理化实验室
 
 从书库选一本教材，翻开立体书，调整参数、触发实验操作，观察装置与读数变化。
 
-本地项目，Vite + React + TypeScript + Three.js。界面、器材几何和实验文字为本项目实现。未发布远程仓库或部署。
+本地项目，Vite + React + TypeScript + Three.js。界面、器材几何和实验文字为本项目实现。源码保存在 [GitHub：lst016/science-lab](https://github.com/lst016/science-lab)，尚未部署在线站点。
 
 ## 启动
 

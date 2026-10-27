@@ -165,7 +165,7 @@ export function Liquid({ p = [0, 0, 0], r, level, color = 'clear', opacity, rot 
     mat.color.set(chemColor(c));
     mat.opacity = opacity ?? (c === 'clear' || c === 'colorless' ? 0.36 : 0.8);
   });
-  return <mesh ref={ref} position={p} rotation={rot} material={mat} geometry={geo} renderOrder={1} />;
+  return <mesh ref={ref} position={p} rotation={rot} material={mat} geometry={geo} renderOrder={1} visible={false} scale={[r, 0.001, r]} />;
 }
 
 /** 固体/粉末堆（半球压扁）。amount 0..1 缩放；color 可随 io 变化。 */

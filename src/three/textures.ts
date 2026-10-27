@@ -193,6 +193,6 @@ export function coverTexture(color: string, title: string, sub: string): THREE.C
   g.fillText(sub, w / 2, 320);
   g.font = '24px "Songti SC","STSong","Noto Serif CJK SC",serif';
   g.globalAlpha = 0.75;
-  g.fillText('初中理化实验书 · 互动实验', w / 2, 560);
+  g.fillText('初中理化实验室 · 互动实验', w / 2, 560);
   return finish(c);
 }

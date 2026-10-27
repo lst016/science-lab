@@ -32,7 +32,7 @@ function BookItem({ book, picked, leaving, resume, onPick }: { book: Book; picke
           <div className="face spine"><span>{label}</span></div>
           <div className="face front">
             <div className="cover-in">
-              <div className="kicker">初中理化实验书</div>
+              <div className="kicker">初中理化实验室</div>
               <div className="subject">{book.subject === 'physics' ? '物理' : '化学'}</div>
               <div className="vol">{book.grade}{book.volume}</div>
               <CoverArt art={cs.art} />
@@ -84,7 +84,7 @@ export function Library() {
       <header className="lib-top">
         <div className="brand">
           <svg viewBox="0 0 32 32" aria-hidden><path d="M3 7c5-2 9-1 13 2v17c-4-3-8-4-13-2z M29 7c-5-2-9-1-13 2v17c4-3 8-4 13-2z" fill="none" stroke="#2b2118" strokeWidth="1.8" strokeLinejoin="round" /></svg>
-          理化实验书
+          理化实验室
         </div>
         <div className="lib-note">带着问题，翻开实验。</div>
       </header>

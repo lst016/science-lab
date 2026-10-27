@@ -1,4 +1,4 @@
-# 理化实验书 Implementation Plan
+# 理化实验室 Implementation Plan
 
 Goal: 创建可本地运行的五册人教版初中理化互动3D动态书书库。
 Architecture: Vite+React+TypeScript，Three.js/R3F承载程序化场景；HTML保持书内正文和控制可读；内容数据和场景族分离。
