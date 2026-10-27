@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Experiment } from '../data/types';
 import { rt } from '../state/runtime';
-import { FLIP_MS, OPEN_MS, SWAP_MS, StageCtrl } from './ctrl';
+import { FLIP_MS, LAND_MS, OPEN_MS, StageCtrl, leafProgress } from './ctrl';
 import { PAGE_H, PAGE_W, createLeaf, createPageBlock, pageTopAt, updateLeaf, updatePageBlock } from './bookGeometry';
 import { coverTexture, deskTexture, edgeTexture, folioTexture, leatherTexture, matTexture, paperTexture } from './textures';
 import { solveHomography, toMatrix3d } from './homography';
@@ -239,8 +239,9 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
 
     /* 翻页叶片 */
     if (leafMesh.current) {
-      if (flipP >= 0) {
-        const p = easeInOut(clamp01((flipP - 0.06) / 0.86));
+      // 落定后立即隐藏，由下面的书页与左页 DOM 接替，避免与之重叠
+      if (flipP >= 0 && now - ctrl.flipStart < LAND_MS) {
+        const p = leafProgress(now - ctrl.flipStart);
         const dir = ctrl.flipDir;
         const theta = dir > 0 ? Math.PI * p : Math.PI * (1 - p);
         updateLeaf(res.leaf, theta, dir > 0 ? 1 : -1);
@@ -253,7 +254,8 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
     let u: number;
     if (opening && openP < 0.8) {
       u = 0;
-    } else if (flipP >= 0 && ctrl.swapAt === 0) {
+    } else if (flipP >= 0 && (ctrl.swapAt === 0 || now < ctrl.swapAt)) {
+      // 折回，并保持折叠直到叶片让开右页
       u = ctrl.fallFrom * (1 - easeInOut(clamp01((now - ctrl.flipStart) / 300)));
     } else if (ctrl.swapAt > 0) {
       const r = clamp01((now - ctrl.swapAt) / 650);
@@ -388,8 +390,8 @@ function Scene({ ctrl, exp, indexLabel, cover, mode, leftEl, layoutSize, bottomP
         </mesh>
       </group>
 
-      {/* 翻页叶片 */}
-      <mesh ref={leafMesh} geometry={res.leaf} material={res.matLeaf} castShadow receiveShadow visible={false} />
+      {/* 翻页叶片：双面材质背面朝上时会被自身阴影染灰，翻页时装置已折叠，无需接收阴影 */}
+      <mesh ref={leafMesh} geometry={res.leaf} material={res.matLeaf} castShadow visible={false} />
 
       {/* 实验装置（站在右页） */}
       <group ref={rigGroup}>

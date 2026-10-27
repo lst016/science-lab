@@ -24,7 +24,7 @@
   transition: opacity 0.25s ease;
 }
 .mode-spread:not(.nogl) .left-host[data-ready='1'] { opacity: 1; }
-.mode-spread:not(.nogl) .left-host.fading { opacity: 0 !important; }
+.mode-spread:not(.nogl) .left-host.fading { opacity: 0 !important; transition-duration: 0.12s; }
 .left-host .pl { height: 100%; }
 
 .pl {

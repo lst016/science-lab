@@ -4,7 +4,7 @@ import type { Experiment } from '../data/types';
 import { navigate, readProgress, saveProgress } from '../state/route';
 import { emitTimeUpdate, loadExperiment, resetExperiment, rt, setPlaying, tick } from '../state/runtime';
 import { BookStage, StageMode } from '../three/BookStage';
-import { FLIP_MS, SWAP_MS, makeCtrl } from '../three/ctrl';
+import { FLIP_MS, LAND_MS, LEFT_CLEAR_MS, RIGHT_CLEAR_MS, SWAP_MS, makeCtrl } from '../three/ctrl';
 import { LeftPage } from './LeftPage';
 import { Toc } from './Toc';
 import { Toolbar } from './Toolbar';
@@ -111,21 +111,26 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
   const pending = useRef<Experiment>(target);
   const shownRef = useRef<Experiment>(shown);
   const swapTimer = useRef<number | undefined>(undefined);
+  const showTimer = useRef<number | undefined>(undefined);
   const endTimer = useRef<number | undefined>(undefined);
   const flipping = useRef(false);
   const swapped = useRef(false);
+  // 仅双页模式的左页 DOM 叠在画布上；单页模式说明区在画布外，换完内容即可显示
+  const overlaysLeaf = useRef(false);
+  overlaysLeaf.current = mode === 'spread' && useGL;
 
   const doSwap = useCallback(() => {
     const next = pending.current;
+    const c = ctrl.current;
     shownRef.current = next;
     setShown(next);
     loadExperiment(next);
-    ctrl.current.closeUp = false;
+    c.closeUp = false;
     setCloseUp(false);
     swapped.current = true;
-    ctrl.current.swapAt = performance.now();
-    ctrl.current.fracTarget = fracOf(exps.indexOf(next));
-    setFading(false);
+    // 向前翻时叶片离开右页后立起；向后翻时叶片最终落在右页，等它落定
+    c.swapAt = c.flipStart + (c.flipDir > 0 ? RIGHT_CLEAR_MS : LAND_MS);
+    c.fracTarget = fracOf(exps.indexOf(next));
     rt.invalidate();
   }, [exps]);
 
@@ -143,11 +148,17 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
     pending.current = next;
     setFading(true);
     window.clearTimeout(swapTimer.current);
+    window.clearTimeout(showTimer.current);
     window.clearTimeout(endTimer.current);
     swapTimer.current = window.setTimeout(doSwap, SWAP_MS);
+    // 左页文字叠在画布上时，必须等叶片离开左页（向后翻）或落定（向前翻）才显示，否则会盖在叶片上
+    showTimer.current = window.setTimeout(() => {
+      if (pending.current === shownRef.current) setFading(false);
+    }, !overlaysLeaf.current ? SWAP_MS : dir > 0 ? LAND_MS : LEFT_CLEAR_MS);
     endTimer.current = window.setTimeout(() => {
       flipping.current = false;
       if (pending.current !== shownRef.current) startFlip(pending.current);
+      else setFading(false);
     }, FLIP_MS);
     rt.invalidate();
   }, [exps, doSwap]);
@@ -158,6 +169,7 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
     ctrl.current.fracTarget = fracOf(exps.indexOf(target));
     return () => {
       window.clearTimeout(swapTimer.current);
+      window.clearTimeout(showTimer.current);
       window.clearTimeout(endTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
