@@ -102,7 +102,7 @@ export function simulateShB(c: SimCtx): Observation | null {
       const n = c.count('run');
       const inWarm = n % 2 === 1;
       const move = n === 0 ? 0 : c.action.id === 'run' ? smooth(c.since('run') / 1.2) : 1;
-      const prog = inWarm ? move : 1 - move;
+      const prog = n === 0 ? 0 : inWarm ? move : 1 - move;
       const leftFeel = prog > 0.5 ? warm - hot : hot - 33;
       const rightFeel = prog > 0.5 ? warm - cold : cold - 33;
       const word = (d: number) => (d > 4 ? '热' : d > 1 ? '温热' : d < -4 ? '冷' : d < -1 ? '凉' : '差不多');
@@ -119,9 +119,10 @@ export function simulateShB(c: SimCtx): Observation | null {
       const Tw = c.p('water', 80);
       const pull = c.p('pull', 6);
       const V0 = 1, p0 = 101.3;
-      const pulled = c.count('run') % 2 === 1;
-      const move = c.count('run') === 0 ? 0 : c.action.id === 'run' ? smooth(c.since('run') / 1.2) : 1;
-      const prog = pulled ? move : 1 - move;
+      const n = c.count('run');
+      const pulled = n % 2 === 1;
+      const move = n === 0 ? 0 : c.action.id === 'run' ? smooth(c.since('run') / 1.2) : 1;
+      const prog = n === 0 ? 0 : pulled ? move : 1 - move;
       const dV = pull * prog;
       const p = (p0 * V0) / (V0 + dV);
       const Tb = boilingPointAt(p);

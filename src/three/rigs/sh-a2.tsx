@@ -65,7 +65,8 @@ function Magdeburg() {
 /* ---------- 倒插水槽的玻璃管 ---------- */
 function InvertedTube() {
   const X = -0.3, SURF = 0.62, BOT = 0.28;
-  const top = (io: RigIO) => SURF + mapRange(io.p('length', 0.5), 0.2, 12, 1.0, 2.55);
+  // 显示高度按比例压缩，12 m 时管顶约 y=2.67，与顶部状态文字（y=3.35）留出间距。
+  const top = (io: RigIO) => SURF + mapRange(io.p('length', 0.5), 0.2, 12, 0.9, 2.05);
   return <group>
     <GlassBox p={[X, 0.04, 0]} w={2.6} d={1.2} h={0.75} />
     <Liquid p={[X, 0.07, 0]} w={2.5} d={1.1} level={() => SURF - 0.07} />
@@ -86,8 +87,8 @@ function InvertedTube() {
       <Box s={[0.34, 0.1, 0.3]} m={SKIN_MAT} />
     </Mv>
     {/* 竖直标尺：从水面量起 */}
-    <Box p={[0.75, 1.75, 0]} s={[0.05, 2.3, 0.05]} m={MAT.darkWood} />
-    <Ticks p={[0.78, SURF, 0]} n={10} dy={0.23} len={0.14} />
+    <Box p={[0.75, 1.62, 0]} s={[0.05, 2.0, 0.05]} m={MAT.darkWood} />
+    <Ticks p={[0.78, SURF, 0]} n={10} dy={0.2} len={0.14} />
     <Label p={[1.25, 0.7, 0.2]} text="水面" size={0.2} />
     <Label p={[X - 1.35, 1.05, 0.3]} text="水槽" size={0.22} />
     <Label p={[X - 0.7, 2.0, 0.3]} text="玻璃管" size={0.22} />
@@ -173,9 +174,9 @@ function BottomlessBottle() {
     {/* 乒乓球 */}
     <Mv upd={(g, io) => { const up = io.sb('floatUp', false); const target = up ? surf(io) - ballR * 0.35 : seatY; g.position.set(X, io.damp('ball', target, up ? 1.5 : 6), 0); }}>
       <Ball r={ballR} m={BALL_W} />
+      <Label p={[0.72, 0.05, 0.3]} text="乒乓球" size={0.22} />
     </Mv>
     <Label p={[X - 1.0, 2.2, 0.3]} text="无底瓶" size={0.22} />
-    <Label p={[X + 0.95, 0.75, 0.3]} text="乒乓球" size={0.22} />
     <Mv upd={(g, io) => { g.visible = io.sb('capped', false); }}><Label p={[X - 0.65, 0.3, 0.6]} text="瓶盖" size={0.2} /></Mv>
     <Mv upd={(g, io) => { g.visible = !io.sb('capped', false); }}><Label p={[X - 0.85, 0.35, 0.6]} text="漏水" size={0.2} color="#2f5888" /></Mv>
     <IoLabel p={[0, 3.3, 0.3]} size={0.24} get={io => io.sb('floatUp', false) ? '下方有水 → 有浮力 → 上浮' : io.sb('capped', false) ? '拧上瓶盖，球下方将充满水' : '下方无水 → 无浮力 → 不上浮'} />
@@ -219,6 +220,8 @@ function Diver() {
 
 /* ---------- 小帆船 ---------- */
 function Sailboat() {
+  // 船体从 x−0.5 到 x+0.77；dist 0→2 m 映射到 x −1.3→1.3，船头距水池右壁（2.25）留约 0.18 边距。
+  const boatX = (io: RigIO, key: string) => -1.3 + clamp(io.damp(key, io.s('dist', 0), 3), 0, 2) * 1.3;
   return <group>
     <IBox p={[0, 0.1, 0]} s={[4.7, 0.2, 2.2]} m={MAT.darkWood} />
     <Box p={[0, 0.27, 0]} s={[4.5, 0.14, 2.0]} m={WATER} cast={false} />
@@ -230,12 +233,13 @@ function Sailboat() {
         {[0, 1, 2].map(i => <Box key={i} s={[0.03, 0.5, 0.1]} rot={[i * Math.PI / 3, 0, 0]} m={MAT.blue} />)}
       </Mv>
     </group>
-    <Mv upd={(g, io) => { const x = -1.3 + io.damp('dist', io.s('dist', 0), 3) * 1.6; g.position.set(x, 0.36, 0); g.rotation.x = io.damp('heel', io.s('heel', 0), 2.5); }}>
+    <Mv upd={(g, io) => { g.position.set(boatX(io, 'dist'), 0.36, 0); g.rotation.x = io.damp('heel', io.s('heel', 0), 2.5); }}>
       <BoatHull />
     </Mv>
     <Label p={[-2.05, 1.25, 0.3]} text="风扇" size={0.2} />
-    <Mv upd={(g, io) => { g.position.x = -1.3 + io.damp('distL', io.s('dist', 0), 3) * 1.6; }}><Label p={[0.5, 0.95, 0.6]} text="瓶身浮筒" size={0.2} /></Mv>
-    <Label p={[1.6, 0.55, 0.95]} text="水池" size={0.2} />
+    <Mv upd={(g, io) => { g.position.x = boatX(io, 'distL'); }}><Label p={[0.5, 0.95, 0.6]} text="瓶身浮筒" size={0.2} /></Mv>
+    {/* 标签贴在水池前沿外侧，低于船体，航行时不被遮住 */}
+    <Label p={[1.85, 0.1, 1.3]} text="水池" size={0.2} />
     <IoLabel p={[0.2, 3.35, 0.3]} size={0.22} get={io => io.sb('capsize', false) ? '单瓶船倾覆' : `倾角 ${(io.s('heel', 0) * 57.3).toFixed(1)}° · 航行 ${io.s('dist', 0).toFixed(2)} m`} />
   </group>;
 }
@@ -276,8 +280,8 @@ function PryBook() {
       <Mv upd={(g, io) => { const len = (io.idx('tool', 0) === 1 ? 17 : 30) * S; const l2 = io.p('l2', 4) * S + 0.1; g.position.x = l2 - len / 2; g.scale.x = len; }}>
         <Box s={[1, 0.035, 0.22]} m={CARD_MAT} />
       </Mv>
-      {/* 动力 F1（在左端向下） */}
-      <Mv upd={(g, io) => { const len = (io.idx('tool', 0) === 1 ? 17 : 30) * S; const l2 = io.p('l2', 4) * S + 0.1; g.position.set(l2 - len + 0.08, 0.06 + io.s('F1', 0.5) * 0.5 + 0.2, 0); g.scale.y = Math.max(0.05, 0.2 + io.s('F1', 0.5) * 0.5); g.visible = io.sb('active', false); }}>
+      {/* 动力 F1（在左端向下）：箭头长度按 ln(1+F1) 压缩并封顶，大力时不伸出书页，大小关系仍单调 */}
+      <Mv upd={(g, io) => { const len = (io.idx('tool', 0) === 1 ? 17 : 30) * S; const l2 = io.p('l2', 4) * S + 0.1; const a = Math.min(1.5, 0.25 + 0.6 * Math.log1p(Math.max(0, io.s('F1', 0.5)))); g.position.set(l2 - len + 0.08, 0.06 + a, 0); g.scale.y = a; g.visible = io.sb('active', false); }}>
         <group rotation={[0, 0, Math.PI]}><Arrow /></group>
       </Mv>
     </Mv>

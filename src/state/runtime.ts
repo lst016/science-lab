@@ -59,6 +59,9 @@ export function loadExperiment(exp: Experiment) {
 }
 
 export function setParam(key: string, value: number) {
+  if (rt.params[key] !== value && (rt.exp?.sceneVariant === 'sh-flask-micro-deformation' || rt.exp?.sceneVariant === 'sh-press-spring')) {
+    rt.action = emptyAction();
+  }
   rt.params = { ...rt.params, [key]: value };
   rt.rev++;
   emit();

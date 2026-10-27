@@ -282,22 +282,23 @@ function AtomModels() {
   const m = useOptIndex('model');
   const pos = useMat(() => new THREE.MeshStandardMaterial({ color: '#e7837a', transparent: true, opacity: 0.38, roughness: 0.4, depthWrite: false }));
   const spin = (g: THREE.Group, io: RigIO) => { g.rotation.y = io.sb('rotating', false) ? io.t * 0.6 : 0.3; };
-  const electron = (key: string | number, p: V3) => <Ball key={key} p={p} r={0.06} m={MAT.blue} />;
+  const atomBall = (r: number, m: THREE.Material, p: V3 = [0, 0, 0]) => <mesh position={p} material={m}><sphereGeometry args={[r, 24, 18]} /></mesh>;
+  const electron = (key: string | number, p: V3) => <group key={key}>{atomBall(0.06, MAT.blue, p)}</group>;
   const orbitE = (r: number, n: number, speed: number, tilt: V3, ph = 0) => <group rotation={tilt}><Mv upd={(g, io) => { g.rotation.y = (io.sb('rotating', false) ? io.t * speed : 0) + ph; }}>{Array.from({ length: n }, (_, i) => electron(i, [Math.cos(i * 2 * Math.PI / n) * r, 0, Math.sin(i * 2 * Math.PI / n) * r]))}</Mv></group>;
   return <group>
     <Mv p={[0, 1.85, 0]} upd={spin}>
-      {m === 0 && <Ball r={0.8} m={MAT.darkSteel} />}
+      {m === 0 && atomBall(0.8, MAT.darkSteel)}
       {m === 1 && <>
         <mesh material={pos}><sphereGeometry args={[0.85, 32, 24]} /></mesh>
         {[[0.3, 0.35, 0.2], [-0.35, 0.2, 0.3], [0.1, -0.4, 0.35], [-0.2, -0.25, -0.4], [0.45, -0.05, -0.3], [-0.45, 0.45, -0.1]].map((q, i) => electron(i, q as V3))}
       </>}
       {m === 2 && <>
-        <Ball r={0.07} m={MAT.red} />
+        {atomBall(0.07, MAT.red)}
         <Orbit r={0.75} tilt={[Math.PI / 2, 0, 0]} /><Orbit r={0.65} tilt={[0.6, 0.4, 0]} /><Orbit r={0.82} tilt={[-0.5, 0.9, 0]} />
         {orbitE(0.75, 2, 1.4, [0, 0, 0])}{orbitE(0.65, 2, 1.1, [Math.PI / 2 - 0.6, 0.4, 0], 1)}{orbitE(0.82, 2, 0.9, [Math.PI / 2 + 0.5, 0.9, 0], 2)}
       </>}
       {m === 3 && <>
-        <Ball r={0.1} m={MAT.red} />
+        {atomBall(0.1, MAT.red)}
         <Orbit r={0.4} tilt={[Math.PI / 2, 0, 0]} /><Orbit r={0.82} tilt={[Math.PI / 2, 0, 0]} />
         {orbitE(0.4, 2, 1.5, [0, 0, 0])}{orbitE(0.82, 4, 0.8, [0, 0, 0], 0.4)}
       </>}
@@ -363,7 +364,7 @@ const BED = Array.from({ length: 8 }, (_, i) => {
   return { x: Math.cos(a) * rr, z: Math.sin(a) * rr, y: 0.03 + rnd(3) * 0.05, w: 0.25 + rnd(4) * 0.05, h: 0.1 + rnd(5) * 0.04, ph: rnd(6) * Math.PI * 2, rs: (rnd(7) - 0.5) * 0.12, tex: (i + 1) % 4 };
 });
 function MassConservation() {
-  const hA = (io: RigIO) => io.p('cuso4', 5) / 10 * 0.62, hB = (io: RigIO) => io.p('naoh', 5) / 10 * 0.62;
+  const hA = (io: RigIO) => io.p('cuso4', 5) * 0.036, hB = (io: RigIO) => io.p('naoh', 5) * 0.036;
   const k = (io: RigIO) => Math.sin(Math.PI * clamp(io.s('pour', 0), 0, 1));
   const toHex = (a: string, b: string, t: number) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), clamp(t, 0, 1)).getHexString();
   const levelB = (io: RigIO) => hB(io) + hA(io) * clamp(io.s('pour', 0), 0, 1);
@@ -461,7 +462,7 @@ function Co2Capture() {
     <GasBubbles p={[-0.1, 0.12, 0]} spread={0.12} height={0.6} count={10} when={(io) => io.s('bubbles', 0) > 0} rate={() => 1} />
     {/* 出气管 → 气球（收集未被吸收的 CO₂） */}
     <Tube pts={[[0.15, 1.3, 0], [0.15, 1.6, 0], [0.6, 1.6, 0], [1.25, 1.55, 0]]} r={0.03} m={MAT.glass} />
-    <Mv upd={(g, io) => { const r = 0.1 + 0.42 * Math.cbrt(clamp(io.s('residual', 0) / 500, 0, 1)); g.position.set(1.3 + r, 1.55, 0); g.scale.set(r, r * 1.15, r); }}>
+    <Mv upd={(g, io) => { const r = 0.1 + 0.23 * Math.cbrt(clamp(io.s('residual', 0) / 500, 0, 1)); g.position.set(1.3 + r, 1.55, 0); g.scale.set(r, r * 1.15, r); }}>
       <mesh material={bal}><sphereGeometry args={[1, 24, 18]} /></mesh>
     </Mv>
     <Label text="注射器 CO₂" p={[SX, 1.5, 0]} size={0.2} />

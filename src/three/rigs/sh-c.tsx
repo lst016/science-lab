@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { Ball, Box, Cyl, Label, MAT, Rod, V3, col } from '../kit';
 import type { ShRigMap } from './sh-types';
@@ -64,7 +64,7 @@ function ElectroscopeTest() {
             <group>
               <Box p={[0, 0.2, 0]} s={[0.16, 0.36, 0.09]} m={MAT.darkWood} />
               <Box p={[0, 0.02, 0.06]} s={[0.18, 0.1, 0.03]} m={MAT.darkWood} />
-              <Label p={[0.42, 0.42, 0]} text="木夹" size={0.2} />
+              <Label p={[0.55, -0.2, 0]} text="木夹" size={0.2} />
             </group>
           )}
           <Label p={[-0.75, 0.24, 0]} text={conn === 1 ? '木棒' : '金属棒'} size={0.2} />
@@ -190,7 +190,8 @@ function ParallelEquivalent() {
   const i1 = (io: RigIO) => (on(io) ? io.s('current1', 0) : 0);
   const i2 = (io: RigIO) => (on(io) ? io.s('current2', 0) : 0);
   const p1 = at(0.3, Z1), p2 = at(0.3, Z2);
-  const colT = at(XL, (Z1 + ZBP) / 2);
+  // 把表移到干路内侧，避免表壳遮住左侧两条支路的导线。
+  const colT = at(XL + 0.7, (Z1 + ZBP) / 2);
   return (
     <ParallelFrame br1={[T.res(p1)]} br2={[T.res(p2)]} i={total} i1={i1} i2={i2} leftTrunk={[T.down(colT, 0.6, 0.25)]}>
       <Resistor p={p1} ohms={() => 10} tag="R₁" />
@@ -252,11 +253,14 @@ function LedCircuit() {
 }
 
 /** 上海版独有活动装置（组 C），按 sceneVariant 索引。 */
+// 电路板前缘要留出右页底部图注的位置；元件与导线一起缩放，保持接线关系。
+const onCircuitPage = (rig: ReactNode) => <group position={[0, 0, -0.45]} scale={0.72}>{rig}</group>;
+
 export const SH_RIGS_C: ShRigMap = {
   'sh-electroscope-conductor-test': () => <ElectroscopeTest />,
-  'sh-simple-bulb-circuit': () => <SimpleBulb />,
-  'sh-conductor-material-comparison': () => <MaterialCompare />,
-  'sh-series-equivalent-resistance': () => <SeriesEquivalent />,
-  'sh-parallel-equivalent-resistance': () => <ParallelEquivalent />,
-  'sh-led-circuit': () => <LedCircuit />,
+  'sh-simple-bulb-circuit': () => onCircuitPage(<SimpleBulb />),
+  'sh-conductor-material-comparison': () => onCircuitPage(<MaterialCompare />),
+  'sh-series-equivalent-resistance': () => onCircuitPage(<SeriesEquivalent />),
+  'sh-parallel-equivalent-resistance': () => onCircuitPage(<ParallelEquivalent />),
+  'sh-led-circuit': () => onCircuitPage(<LedCircuit />),
 };

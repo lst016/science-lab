@@ -98,11 +98,11 @@ function SimpleInstrument() {
   const kind = useOptIndex('kind', 0);
   return <group>
     {kind === 0 ? <PanPipe /> : <BandBox />}
-    <group position={[1.75, 0, 0.5]}>
+    <group position={[1.75, 0, 1.25]}>
       <Box p={[0, 0.06, 0]} s={[0.55, 0.06, 1]} m={MAT.black} rot={[0, 0.3, 0]} />
       <Box p={[0, 0.095, 0]} s={[0.48, 0.01, 0.88]} m={PHONE_SCREEN_MAT} rot={[0, 0.3, 0]} />
     </group>
-    <Label text="手机测频率" p={[1.75, 0.75, 0.5]} size={0.2} />
+    <Label text="手机测频率" p={[1.75, 0.55, 1.25]} size={0.2} />
     <IoLabel p={[0, 3.35, 0]} size={0.24} get={(io) => '频率约 ' + fmt0(io.s('frequency', 0)) + ' Hz' + (io.s('loud', 0) > 0.05 ? '（发声中）' : '')} />
   </group>;
 }
@@ -179,7 +179,7 @@ function WaterLens() {
       pts[0] = ox; pts[1] = oy; pts[2] = 0; pts[3] = LX; pts[4] = ly; pts[5] = 0; pts[6] = ex; pts[7] = ly + (iy - ly) * t; pts[8] = 0;
     }} />)}
     <Mv upd={(g, io) => { g.position.x = objX(io); }}><Label text="发光物" p={[0, 2.05, 0]} size={0.22} /></Mv>
-    <Label text="水透镜" p={[LX - 0.15, 0.75, 0.55]} size={0.22} />
+    <Label text="水透镜" p={[LX, AXIS + 0.68, 0.2]} size={0.22} />
     <Label text="注射器" p={[-0.25, 2.95, 0]} size={0.22} />
     <Label text="光屏（视网膜）" p={[SCR_X + 0.15, 2.25, 0]} size={0.21} />
     <IoLabel p={[0, 3.35, 0]} size={0.24} get={(io) => !io.sb('lit', false) ? '点“开始实验”打开发光物' : 'f≈' + fmt1(io.s('focal', 10)) + ' cm，像距 ' + fmt1(io.s('imageDistance', 15)) + ' cm' + (io.s('blur', 0) < 0.08 ? '，清晰' : '，模糊')} />
@@ -300,7 +300,7 @@ function IodineSublimation() {
       <Label text="加热器" p={[1.05, 0.15, 0.6]} size={0.2} />
     </group>}
     <Label text="塞子" p={[0.65, lamp ? 3.05 : 2.5, 0]} size={0.21} />
-    <Label text="固态碘" p={[lamp ? -0.75 : 1.35, lamp ? 1.05 : 0.6, 0.4]} size={0.21} />
+    <Label text="固态碘" p={[0.65, lamp ? 1.08 : 0.5, 0.35]} size={0.21} />
     <IoLabel p={[0, 3.4, 0]} size={0.24} get={(io) => io.n('run') === 0 ? '点“开始实验”微微加热' : io.sb('melted', false) ? '超过熔点，出现液态碘' : io.sb('heating', false) ? '紫色碘蒸气：升华' : io.s('deposit', 0) > 0.05 ? '冷壁出现碘晶体：凝华' : '停止加热'} />
   </group>;
 }
@@ -372,14 +372,15 @@ function HeatIsland() {
       <Label text="水泥地" p={[0.4, 0.45, 1.05]} size={0.24} />
       <Mv upd={(g, io) => { g.visible = io.idx('source', 0) === 1; }}>
         <group position={[0.55, 0.16, -0.55]}>
-          <IBox p={[0, 0.35, 0]} s={[0.75, 0.7, 0.45]} m={MAT.white} />
-          <Cyl p={[0, 0.35, 0.23]} r={0.22} h={0.03} rot={[Math.PI / 2, 0, 0]} m={MAT.darkSteel} />
+          <Box p={[0, 0.035, 0]} s={[0.85, 0.07, 0.55]} m={MAT.darkSteel} />
+          <IBox p={[0, 0.42, 0]} s={[0.75, 0.7, 0.45]} m={MAT.white} />
+          <Cyl p={[0, 0.42, 0.23]} r={0.22} h={0.03} rot={[Math.PI / 2, 0, 0]} m={MAT.darkSteel} />
           <Smoke p={[0, 0.35, 0.3]} amount={() => 0.8} n={5} rise={0.8} spread={0.15} size={0.07} color="#f2a070" opacity={0.25} />
           <Label text="空调外机" p={[0, 0.95, 0]} size={0.2} />
         </group>
       </Mv>
     </group>
-    <Mv upd={(g, io) => { const u = clamp((io.p('hour', 14) - 6) / 12, 0, 1); g.position.set(-2 + 4 * u, 2.1 + 0.9 * Math.sin(Math.PI * u), -1.3); }}>
+    <Mv upd={(g, io) => { const u = clamp((io.p('hour', 14) - 6) / 12, 0, 1); g.position.set(-0.9 + 1.8 * u, 1.9 + 0.45 * Math.sin(Math.PI * u), -0.65); }}>
       <mesh material={sunMat}><sphereGeometry args={[0.24, 20, 14]} /></mesh>
       <Mv upd={(g, io) => { g.visible = io.idx('weather', 0) === 1; }}>
         {[[-0.2, 0, 0.3], [0.1, 0.06, 0.32], [0.32, -0.03, 0.28]].map((p, i) => <Ball key={i} p={p as V3} r={0.2} m={MAT.white} />)}

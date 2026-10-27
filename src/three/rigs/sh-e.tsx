@@ -102,16 +102,16 @@ function EvaporatePlate() {
       <Dropper p={[-0.45, 1.68, 0.1]} len={0.55} active={(io) => pulse(io, 'add', 2.4)} />
       <Dropper p={[0.45, 1.68, 0.1]} len={0.55} active={(io) => pulse(io, 'add', 2.4)} />
     </Mv>
-    <group position={[1.6, 1.95, 0.35]} rotation={[-0.9, 0, 0.35]}>
+    <group position={[1.25, 1.95, 0.35]} rotation={[-0.9, 0, 0.35]}>
       <mesh material={MAT.black}><torusGeometry args={[0.26, 0.03, 10, 32]} /></mesh>
       <Cyl r={0.25} h={0.012} rot={[Math.PI / 2, 0, 0]} m={MAT.glass} cast={false} />
       <Rod a={[0.26, 0, 0]} b={[0.68, 0, 0]} r={0.035} m={MAT.wood} />
     </group>
-    <Label text="放大镜" p={[1.65, 2.45, 0.35]} size={0.2} />
+    <Label text="放大镜" p={[1.3, 2.45, 0.35]} size={0.2} />
     <Label text="铜片" p={[-1.18, 1.5, 0.3]} size={0.2} />
     <Label text="沸水" p={[0, 0.45, 0.85]} size={0.2} />
-    <Label text="NaCl 溶液" p={[-0.5, 1.12, 0.7]} size={0.18} />
-    <Label text="KNO₃ 溶液" p={[0.5, 1.12, 0.7]} size={0.18} />
+    <Label text="NaCl 溶液" p={[-0.8, 2.3, 0]} size={0.18} />
+    <Label text="KNO₃ 溶液" p={[0.65, 2.3, 0]} size={0.18} />
     <IoLabel p={[0, 3.3, 0]} size={0.22} get={(io) => !io.sb('placed', false) ? '先滴加两种饱和溶液'
       : `蒸发${fmt(io.s('evap', 0) * 100, 0)}%｜NaCl${io.s('naclCrystal', 0) > 0.002 ? '有' : '无'}晶体｜KNO₃${io.s('kno3Crystal', 0) > 0.002 ? '有' : '无'}晶体`} />
   </group>;
@@ -190,7 +190,7 @@ function Ammonium() {
     <Cyl p={[-0.3, 0.58, 0]} r={0.07} h={0.2} m={MAT.brass} />
     <Flame p={[-0.3, 0.68, 0]} lit={(io) => io.sb('heating', false)} scale={0.7} />
     <Smoke p={[-0.3, 2.3, 0]} amount={ammonia} color="#dfeaf5" n={6} rise={0.7} spread={0.12} opacity={0.35} />
-    <Strip p={[0.05, 2.55, 0]} s={[0.4, 0.07, 0.012]} rot={[0, 0, -0.35]} color={(io) => '#' + new THREE.Color('#d0545a').lerp(new THREE.Color('#3f6ec4'), io.damp('litmus', io.sb('litmusBlue', false) ? 1 : 0, 2)).getHexString()} />
+    <Strip p={[-0.15, 2.33, 0]} s={[0.4, 0.07, 0.012]} rot={[0, 0, -0.35]} color={(io) => '#' + new THREE.Color('#d0545a').lerp(new THREE.Color('#3f6ec4'), io.damp('litmus', io.sb('litmusBlue', false) ? 1 : 0, 2)).getHexString()} />
     <Mv upd={(g, io) => { g.visible = pulse(io, 'add', 2.4) > 0; }}>
       <Dropper p={[-0.3, 2.45, 0]} len={0.45} active={(io) => pulse(io, 'add', 2.4)} />
     </Mv>
@@ -198,7 +198,7 @@ function Ammonium() {
     <Vessel kind="jar" p={[1.95, 0, -0.1]} r={0.3} h={0.75} level={0.6} liquid="#d9eef0" liquidOpacity={0.6} />
     <Label text="NaOH 溶液" p={[1.15, 1.05, -0.1]} size={0.19} />
     <IoLabel p={[1.95, 1.05, -0.1]} size={0.19} get={(io) => (io.opt('salt') || '铵盐') + '溶液'} />
-    <Label text="湿润红色石蕊试纸" p={[0.95, 2.75, 0]} size={0.19} />
+    <Label text="湿润红色石蕊试纸" p={[0.85, 2.45, 0.3]} size={0.17} />
     <Label text="酒精灯" p={[-0.3, 0.2, 0.6]} size={0.19} />
     <IoLabel p={[0, 3.3, 0]} size={0.22} get={(io) => !io.sb('added', false) ? '红色石蕊试纸放在试管口' : io.sb('litmusBlue', false) ? '微热后试纸变蓝：放出 NH₃' : '对照：试纸不变色'} />
   </group>;
@@ -265,6 +265,8 @@ function LiquidFuels() {
     <Match to={[-0.9, 1.15, 0.05]} />
     <Match to={[0.9, 1.15, 0.05]} from={[1.8, 1.7, 0.25]} />
     {supply === 1 && <group>
+      <Rod a={[1.8, 0.1, 0]} b={[1.8, 1.12, 0]} r={0.025} m={MAT.steel} />
+      <Box p={[1.8, 0.05, 0]} s={[0.45, 0.1, 0.35]} m={MAT.darkSteel} />
       <Rod a={[1.95, 1.12, 0]} b={[1.12, 1.12, 0]} r={0.03} m={MAT.steel} />
       <Cyl p={[1.1, 1.12, 0]} r={0.05} rt={0.02} h={0.12} rot={[0, 0, Math.PI / 2]} m={MAT.brass} />
       <Label text="雾化（示意）" p={[1.75, 1.42, 0]} size={0.18} />

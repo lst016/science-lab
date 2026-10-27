@@ -59,7 +59,9 @@ function SpanEstimate() {
       <Box p={[0.78, 0.05, 0]} s={[0.44, 0.09, 0.11]} m={SKIN} />
     </Mv>
     <Label p={[DESK_X0 + 0.55, 0.65, 0.6]} text="课桌" size={0.22} />
-    <Label p={[DESK_X0 + 0.5, DESK_Y + 0.5, 0.3]} text="1 拃" size={0.2} />
+    <Mv upd={(g, io) => { const s = spanStep(io); g.position.set(DESK_X0 + (s.k + 0.5) * s.span * SPAN_S, DESK_Y + 0.5, 0.3); }}>
+      <Label text="1 拃" size={0.2} />
+    </Mv>
     <IoLabel p={[0, 3.2, 0]} size={0.26} get={(io) => { const s = spanStep(io); return io.n('run') > 0 ? '已量 ' + s.k + ' 拃 · 共约 ' + f(s.desk / s.span) + ' 拃' : '1 拃 = ' + f(s.span) + ' cm · 桌长 ' + f(s.desk, 0) + ' cm'; }} />
   </group>;
 }
@@ -135,7 +137,9 @@ function MotorLift() {
     </group>)}
     <Label p={[0.6, 3.05, 0]} text="电动机" size={0.2} />
     <Label p={[0.95, 0.45, 0]} text="刻度尺" size={0.2} />
-    <Label p={[-0.45, 0.25, 0.35]} text="钩码" size={0.2} />
+    <Mv upd={(g, io) => { g.position.set(-0.45, liftTop(io) - 0.35, 0.35); }}>
+      <Label text="钩码" size={0.2} />
+    </Mv>
     <IoLabel p={[0, 3.4, 0]} size={0.24} get={(io) => {
       const v = io.s('speed', 8), top = liftTop(io);
       if (io.n('run') === 0) return 'v ≈ ' + f(v / 100, 3) + ' m/s · 钩码 ' + f(io.p('mass', 100), 0) + ' g';
@@ -174,7 +178,9 @@ function WaterBalloon() {
       <Cyl p={[0, 1.08, 0]} r={0.12} rt={0.06} h={0.22} m={MAT.red} />
     </Mv>
     <Label p={[-0.5, 2.05, 0.3]} text="对照弹簧" size={0.2} />
-    <Label p={[1.35, 1.25, 0.3]} text="装水气球" size={0.2} />
+    <Mv upd={(g, io) => { const b = balloon(io); g.position.set(WB_X + b.r * lerp(1.1, 0.9, b.h) + 0.55, b.y, 0.3); }}>
+      <Label text="装水气球" size={0.2} />
+    </Mv>
     <Label p={[1.45, 0.45, 0.45]} text="木板" size={0.2} />
     <IoLabel p={[0, 3.35, 0]} size={0.24} get={(io) => 'G = ' + f(io.s('weight', 2.45), 2) + ' N · 伸长 ' + f(io.s('stretch', 0)) + ' cm'} />
   </group>;
@@ -254,7 +260,13 @@ const plBob = (io: RigIO): V3 => {
   const h = plHook(io);
   return [h[0] + PL_LEN * Math.sin(phi), h[1] - PL_LEN * Math.cos(phi), 0];
 };
-const plEnd = (io: RigIO): V3 => { const a = (io.p('tilt', 20) * Math.PI) / 180; return [PL_H[0] + 2.75 * Math.cos(a), PL_H[1] + 2.75 * Math.sin(a), 0]; };
+// 支柱顶部与斜面下表面相切；圆柱有半径，倾角越大顶部需要越低。
+const plSupport = (io: RigIO): [V3, V3] => {
+  const a = (io.p('tilt', 20) * Math.PI) / 180, r = 0.03;
+  const x = PL_H[0] + 2.55 * Math.cos(a);
+  const y = PL_H[1] + 2.55 * Math.sin(a) - r * Math.tan(a);
+  return [[x, 0.2, 0], [x, Math.max(0.2, y), 0]];
+};
 function PlumbLine() {
   return <group>
     <IBox p={[0, 0.1, 0]} s={[3.8, 0.2, 1.2]} m={MAT.darkWood} />
@@ -265,7 +277,7 @@ function PlumbLine() {
       <Box p={[0.8, PL_HOOK[1], 0]} s={[0.45, 0.05, 0.05]} m={MAT.steel} />
       <Label p={[2.2, 0.3, 0.45]} text="斜面" size={0.2} />
     </Mv>
-    <Cord ends={(io) => { const e = plEnd(io); return [[e[0], 0.2, 0], [e[0], Math.max(0.22, e[1] - 0.04), 0]]; }} r={0.03} color="#5c6168" />
+    <Cord ends={plSupport} r={0.03} color="#5c6168" />
     <Cord ends={(io) => [plHook(io), plBob(io)]} r={0.012} color="#2b2622" />
     <Mv upd={(g, io) => { const b = plBob(io); g.position.set(b[0], b[1], b[2]); }}>
       <Cyl p={[0, -0.11, 0]} r={0.01} rt={0.12} h={0.22} m={MAT.brass} />
