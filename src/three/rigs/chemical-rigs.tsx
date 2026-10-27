@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, type ReactElement } from 'react';
 import * as THREE from 'three';
 import type { Experiment } from '../../data/types';
 import { AlcoholLamp, Ball, Box, Cyl, Label, MAT, Rod, Tube, Vessel, type V3 } from '../kit';
-import { useRig } from './io';
+import { clamp, evTime, smooth, useRig } from './io';
 import { IoLabel } from './parts';
-import { Candle, chemColor, DrainCollection, DroppingSetup, DynamicThermo, Ember, Flame, GasBubbles, MetalSamples, ReactiveVessel, Stand } from './chemical-parts';
+import { AcidAppearanceRig, CopperConcentrationRig, MetalActivityRig, SulfuricDehydrationRig, WaterEthanolRig } from './chemical-special-rigs';
+import { Beads, Candle, chemColor, DrainCollection, DroppingSetup, Dropper, DynamicThermo, Ember, Flame, GasBubbles, Liquid, Match, MetalSamples, Pile, ReactiveVessel, Smoke, Sparks, Stand } from './chemical-parts';
 
 function Heading({ exp, note }: { exp: Experiment; note?: string }) {
   return <group><Label text={exp.title.slice(0, 15)} p={[0, 3.45, 0.55]} size={0.24} /><Label text={note ?? exp.equipment.slice(0, 2).join(' · ')} p={[0, 3.1, 0.55]} size={0.19} color="#6b553c" /></group>;
@@ -23,7 +24,7 @@ function GasRig({ exp }: { exp: Experiment }) {
   return <group>
     <Heading exp={exp} note={collects ? '发生 · 导气 · 收集' : '气体性质与检验'} />
     {collects ? <><Stand p={[-1.4, 0, -0.5]} h={2.65} /><ReactiveVessel kind="flask" p={[-1.15, 0.18, -0.25]} r={0.47} h={1.24} liquid="clear" /><Tube pts={[[-1.15, 1.3, -0.25], [-0.8, 1.72, -0.25], [0.25, 1.72, -0.25], [0.75, 1.0, -0.25]]} r={0.045} m={MAT.glass} /><DrainCollection /><GasBubbles p={[-1.15, 0.42, -0.25]} count={10} height={0.65} />{/permanganate|heating|oxygen-preparation/.test(v) && <><AlcoholLamp p={[-1.15, 0, 0.5]} flame={0} /><Flame p={[-1.15, 0.75, 0.5]} stateKey="heating" /></>}</> : <><ReactiveVessel kind="jar" p={[-0.8, 0, 0]} r={0.56} h={1.7} level={0.2} liquid="clear" mode="static" /><ReactiveVessel kind="beaker" p={[1.0, 0, 0]} r={0.48} h={1.2} liquid={co2 ? 'milky-white' : 'clear'} solid={co2} /><Tube pts={[[-0.25, 0.9, 0], [0.2, 1.15, 0], [0.55, 0.8, 0]]} r={0.035} m={MAT.glass} /><GasBubbles p={[0.68, 0.32, 0]} count={9} height={0.55} /></>}
-    {/splint|glowing/.test(v) && <><Rod a={[-0.8, 1.25, 0.45]} b={[-0.8, 1.85, 0.45]} r={0.035} m={MAT.wood} /><Ember p={[-0.8, 1.88, 0.45]} /></>}
+    {/splint|glowing/.test(v) && <><Rod a={[-0.8, 1.25, 0.45]} b={[-0.8, 1.85, 0.45]} r={0.035} m={MAT.wood} /><Ember p={[-0.8, 1.88, 0.45]} when={(io) => io.n('ignite') % 2 === 1} bright={(io) => io.sb('glowingSplint', false)} /></>}
   </group>;
 }
 
@@ -38,7 +39,7 @@ function CO2BottleRig({ exp }: { exp: Experiment }) {
 }
 
 function CO2PrepRig({ exp }: { exp: Experiment }) {
-  return <group><Heading exp={exp} note="碳酸盐与稀酸 · 常温制 CO₂" /><Stand p={[-1.3, 0, -0.35]} h={2.55} /><ReactiveVessel kind="flask" p={[-1.0, 0.05, 0]} r={0.48} h={1.32} liquid="clear" mode="static" /><Cyl p={[-1.0, 1.42, 0]} r={0.11} h={0.18} m={MAT.rubber} /><Tube pts={[[-1.0, 1.5, 0], [-0.54, 1.68, 0], [0.38, 1.68, 0], [0.88, 1.05, 0]]} r={0.045} m={MAT.glass} /><Vessel kind="jar" p={[0.92, 0, 0]} r={0.42} h={1.45} level={0.06} liquid="#d7e9ee" /><ReactiveVessel p={[1.72, 0, 0.18]} r={0.32} h={0.86} liquid="clear" mode="static" /><Tube pts={[[1.2, 0.82, 0], [1.48, 0.82, 0.08]]} r={0.035} m={MAT.glass} /><GasBubbles p={[-1.0, 0.32, 0]} count={10} height={0.7} /><Label text="不加热 · 向上排空气" p={[0, 2.2, 0.4]} size={0.2} /></group>;
+  return <group><Heading exp={exp} note="碳酸盐与稀酸 · 常温制 CO₂" /><Stand p={[-1.3, 0, -0.35]} h={2.55} /><ReactiveVessel kind="flask" p={[-1.0, 0.05, 0]} r={0.48} h={1.32} liquid="clear" mode="static" /><Cyl p={[-1.0, 1.42, 0]} r={0.11} h={0.18} m={MAT.rubber} /><Tube pts={[[-1.0, 1.5, 0], [-0.54, 1.68, 0], [0.38, 1.68, 0], [0.88, 1.05, 0]]} r={0.045} m={MAT.glass} /><Vessel kind="jar" p={[0.92, 0, 0]} r={0.42} h={1.45} level={0.06} liquid="#d7e9ee" /><ReactiveVessel p={[1.72, 0, 0.18]} r={0.32} h={0.86} liquid="clear" /><Tube pts={[[1.2, 0.82, 0], [1.48, 0.82, 0.08]]} r={0.035} m={MAT.glass} /><GasBubbles p={[-1.0, 0.32, 0]} count={10} height={0.7} /><Label text="不加热 · 向上排空气" p={[0, 2.2, 0.4]} size={0.2} /></group>;
 }
 
 function PermanganateRig({ exp }: { exp: Experiment }) {
@@ -106,6 +107,7 @@ function IndicatorRig({ exp }: { exp: Experiment }) {
   const acidic = /acid|neutralization|litmus/.test(exp.sceneVariant);
   if (exp.sceneVariant.includes('soil-ph-plant')) return <group><Heading exp={exp} note="土壤样品 · pH · 植物生长" /><Box p={[0, 0.36, 0]} s={[1.15, 0.7, 0.82]} m={MAT.darkWood} /><Cyl p={[0, 0.77, 0]} r={0.5} h={0.18} m={MAT.wood} /><Cyl p={[0, 0.92, 0]} r={0.42} h={0.18} m={MAT.darkWood} /><Rod a={[0, 1.0, 0]} b={[0, 2.05, 0]} r={0.035} m={MAT.green} /><Rod a={[0, 1.52, 0]} b={[-0.44, 1.82, 0]} r={0.025} m={MAT.green} /><Rod a={[0, 1.6, 0]} b={[0.42, 1.94, 0]} r={0.025} m={MAT.green} /><Ball p={[-0.48, 1.83, 0]} r={0.19} m={MAT.green} /><Ball p={[0.46, 1.95, 0]} r={0.2} m={MAT.green} /><Tube pts={[[0.8, 2.0, 0], [0.92, 1.25, 0], [0.82, 0.86, 0]]} r={0.045} m={MAT.steel} /><ReactiveVessel kind="beaker" p={[1.45, 0, 0.15]} r={0.35} h={0.95} liquid="clear" /><Label text="样品与植物适应性观察" p={[0.4, 2.6, 0.4]} size={0.19} /></group>;
   return <group><Heading exp={exp} note="滴加指示剂 · 观察颜色" /><DroppingSetup color="clear" /><ReactiveVessel p={[1.0, 0, 0]} r={0.55} h={1.42} liquid="clear" solid={exp.sceneVariant.includes('base-properties')} /><Cyl p={[-0.85, 1.58, 0]} r={0.05} h={0.38} m={MAT.rubber} /><Tube pts={[[-0.85, 1.38, 0], [-0.85, 1.06, 0]]} r={0.02} m={MAT.glass} /><Ball p={[-0.85, 1.8, 0]} r={0.12} m={MAT.rubber} /><IoLabel get={(io) => {
+    if (io.opt('test').includes('二氧化碳')) return io.ss('precipitateColor', 'none') === 'white' ? '石灰水出现白色沉淀' : '观察二氧化碳与碱的反应';
     const indicator = io.ss('indicator', exp.sceneVariant.includes('phenolphthalein') ? '酚酞' : '石蕊');
     const color = io.ss('liquidColor', 'colorless');
     const acid = io.sb('acidic', false); const base = io.sb('basic', false);
@@ -168,14 +170,85 @@ function PHPatch({ p }: { p: V3 }) {
 function MassBalance({ exp }: { exp: Experiment }) {
   const lid = useRef<THREE.Mesh>(null);
   useRig((io) => { if (lid.current) lid.current.visible = io.sb('closed', true); });
-  return <group><Heading exp={exp} note="反应前后称量 · 明确系统边界" /><Box p={[0, 1.5, 0]} s={[0.13, 1.55, 0.13]} m={MAT.brass} /><Box p={[0, 2.32, 0]} s={[1.85, 0.1, 0.12]} m={MAT.brass} /><Rod a={[-0.82, 1.4, 0]} b={[-0.82, 0.72, 0]} r={0.018} m={MAT.steel} /><Rod a={[0.82, 1.4, 0]} b={[0.82, 0.72, 0]} r={0.018} m={MAT.steel} /><Box p={[-0.82, 0.68, 0]} s={[0.65, 0.08, 0.48]} m={MAT.brass} /><Box p={[0.82, 0.68, 0]} s={[0.65, 0.08, 0.48]} m={MAT.brass} /><ReactiveVessel kind="flask" p={[-0.82, 0.75, 0]} r={0.23} h={0.7} level={0.25} liquid="clear" mode="static" /><Vessel kind="jar" p={[0.82, 0.75, 0]} r={0.25} h={0.7} level={0.25} /><mesh ref={lid} position={[0.82, 1.45, 0]}><boxGeometry args={[0.52, 0.07, 0.52]} /><meshStandardMaterial color="#444448" /></mesh><IoLabel get={(io) => `前 ${io.s('massBefore', io.p('mass', 10)).toFixed(1)} g · 后 ${io.s('massAfter', io.p('mass', 10)).toFixed(1)} g`} p={[0, 2.75, 0.25]} size={0.18} /></group>;
+  return <group><Heading exp={exp} note="反应前后称量 · 明确系统边界" /><Box p={[0, 1.5, 0]} s={[0.13, 1.55, 0.13]} m={MAT.brass} /><Box p={[0, 2.32, 0]} s={[1.85, 0.1, 0.12]} m={MAT.brass} /><Rod a={[-0.82, 1.4, 0]} b={[-0.82, 0.72, 0]} r={0.018} m={MAT.steel} /><Rod a={[0.82, 1.4, 0]} b={[0.82, 0.72, 0]} r={0.018} m={MAT.steel} /><Box p={[-0.82, 0.68, 0]} s={[0.65, 0.08, 0.48]} m={MAT.brass} /><Box p={[0.82, 0.68, 0]} s={[0.65, 0.08, 0.48]} m={MAT.brass} /><ReactiveVessel kind="flask" p={[-0.82, 0.75, 0]} r={0.23} h={0.7} level={0.25} liquid="clear" mode="static" /><Vessel kind="jar" p={[0.82, 0.75, 0]} r={0.25} h={0.7} level={0.25} /><mesh ref={lid} position={[0.82, 1.45, 0]}><boxGeometry args={[0.52, 0.07, 0.52]} /><meshStandardMaterial color="#444448" /></mesh><IoLabel get={(io) => io.n('run') === 0 && io.n('add') === 0 && io.n('ignite') === 0 ? '反应前：观察质量' : io.s('massTrend', 0) < 0 ? '反应后：称量质量减少（示意）' : io.s('massTrend', 0) > 0 ? '反应后：称量质量增加（示意）' : '反应前后质量相等（示意）'} p={[0, 2.75, 0.25]} size={0.18} /></group>;
 }
 
 function TransferDevice({ exp }: { exp: Experiment }) {
-  const tube = useRef<THREE.Group>(null);
-  const block = useRef<THREE.Mesh>(null); const powder = useRef<THREE.Mesh>(null);
-  useRig((io) => { if (tube.current) tube.current.rotation.z = -io.p('tilt', 15) * Math.PI / 180; const isPowder = io.ss('material', '大理石').includes('粉'); const moved = io.n('add') > 0; if (block.current) { block.current.visible = !isPowder; block.current.position.x = moved ? -0.15 : 0.9; } if (powder.current) { powder.current.visible = isPowder; powder.current.position.x = moved ? -0.15 : 0.9; } });
-  return <group><Heading exp={exp} note="镊子取块状 · 药匙取粉末" /><group ref={tube} position={[-0.15, 0.85, 0]}><Vessel kind="tube" p={[0, -0.75, 0]} r={0.25} h={1.25} level={0.08} liquid="#b9e5e8" /></group><Rod a={[-1.2, 1.8, 0]} b={[-0.4, 1.1, 0]} r={0.025} m={MAT.steel} /><Box p={[0.9, 0.12, 0]} s={[1.0, 0.15, 0.55]} m={MAT.white} /><Cyl p={[0.75, 0.72, 0]} r={0.045} h={1.15} m={MAT.steel} /><Box p={[0.75, 1.3, 0]} s={[0.33, 0.06, 0.12]} m={MAT.steel} /><mesh ref={block} position={[0.9, 0.28, 0]}><dodecahedronGeometry args={[0.12, 0]} /><meshStandardMaterial color="#74736e" /></mesh><mesh ref={powder} position={[0.9, 0.22, 0]}><sphereGeometry args={[0.13, 8, 6]} /><meshStandardMaterial color="#c9c8bf" /></mesh><Label text="药匙 / 试管" p={[0.5, 2.0, 0.4]} size={0.2} /></group>;
+  const tilt = useRef<THREE.Group>(null);
+  const tool = useRef<THREE.Group>(null);
+  const solid = useRef<THREE.Group>(null);
+  const tweezers = useRef<THREE.Group>(null);
+  const spoon = useRef<THREE.Group>(null);
+  const chunk = useRef<THREE.Mesh>(null);
+  const grains = useRef<THREE.Mesh>(null);
+  const damage = useRef<THREE.Mesh>(null);
+  const spill = useRef<THREE.Mesh>(null);
+  const previousRun = useRef(0);
+  const startedSafely = useRef(true);
+  useRig((io) => {
+    if (tilt.current) tilt.current.rotation.z = -io.p('tilt', 15) * Math.PI / 180;
+    const powderMode = io.ss('material', io.opt('material')).includes('粉');
+    const runs = io.n('run');
+    if (runs !== previousRun.current) { if (runs > 0) startedSafely.current = io.p('tilt', 90) >= 75; previousRun.current = runs; }
+    const safe = runs > 0 ? startedSafely.current : io.sb('safeTransfer', true);
+    const s = io.since('run');
+    const k = s < 0 ? 0 : clamp(s / 3.4, 0, 1);
+    const mouthU = 0.5, startU = 1.05, bottomU = powderMode ? -0.56 : -0.5;
+    let toolU: number;
+    let solidU: number;
+    if (powderMode && safe) {
+      // 药匙连同粉末送至管底，再退出；药品留在管内。
+      toolU = k < 0.55 ? startU + (bottomU - startU) * smooth(k / 0.55) : bottomU + (startU - bottomU) * smooth((k - 0.55) / 0.3);
+      solidU = k < 0.55 ? toolU : bottomU;
+    } else {
+      toolU = k < 0.25 ? startU + (mouthU - startU) * smooth(k / 0.25) : mouthU + (startU - mouthU) * smooth((k - 0.25) / 0.3);
+      // 安全放入块状固体后，随试管慢慢竖起才滑向底部。
+      const upright = clamp((90 - io.p('tilt', 90)) / 75, 0, 1);
+      solidU = k < 0.25 ? toolU : powderMode ? mouthU - 0.02 : safe ? mouthU + (bottomU - mouthU) * smooth(upright) : mouthU + (bottomU - mouthU) * Math.pow(clamp((k - 0.25) / 0.2, 0, 1), 2);
+    }
+    tool.current?.position.set(0, toolU, 0);
+    solid.current?.position.set(powderMode && !safe && k >= 0.25 ? 0.2 : 0.1, solidU, 0);
+    if (tweezers.current) tweezers.current.visible = !powderMode;
+    if (spoon.current) spoon.current.visible = powderMode;
+    if (chunk.current) chunk.current.visible = !powderMode;
+    if (grains.current) { grains.current.visible = powderMode; grains.current.scale.set(1, 0.6, 1); }
+    if (damage.current) damage.current.visible = !powderMode && !safe && k > 0.45;
+    if (spill.current) spill.current.visible = powderMode && !safe && k > 0.3;
+  });
+  return <group>
+    <Heading exp={exp} note="镊子取块状 · 药匙取粉末" />
+    <Stand p={[-1.75, 0, -0.35]} h={2.6} />
+    <Rod a={[-1.6, 1.15, -0.3]} b={[-0.65, 1.15, -0.02]} r={0.03} m={MAT.steel} />
+    <group position={[-0.35, 1.15, 0]}>
+      <group ref={tilt}>
+        <Vessel kind="tube" p={[0, -0.65, 0]} r={0.26} h={1.3} />
+        <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[0.29, 0.03, 8, 24]} /><primitive object={MAT.brass} attach="material" /></mesh>
+        <group ref={solid}>
+          <mesh ref={chunk}><dodecahedronGeometry args={[0.13, 0]} /><meshStandardMaterial color="#8c8a84" roughness={0.85} /></mesh>
+          <mesh ref={grains}><sphereGeometry args={[0.15, 12, 8]} /><meshStandardMaterial color="#e5e3da" roughness={1} /></mesh>
+        </group>
+        <mesh ref={damage} position={[0, -0.6, 0]} rotation={[Math.PI / 2, 0, 0]} visible={false}><torusGeometry args={[0.2, 0.012, 6, 20]} /><meshBasicMaterial color="#d84e45" /></mesh>
+        <mesh ref={spill} position={[0.2, 0.6, 0]} scale={[1, 0.5, 1]} visible={false}><sphereGeometry args={[0.08, 8, 6]} /><meshStandardMaterial color="#e5e3da" /></mesh>
+        <group ref={tool}>
+          <group ref={tweezers}>
+            <Rod a={[0.06, 0.02, 0]} b={[0.1, 0.95, 0]} r={0.016} m={MAT.steel} />
+            <Rod a={[-0.06, 0.02, 0]} b={[-0.1, 0.95, 0]} r={0.016} m={MAT.steel} />
+          </group>
+          <group ref={spoon}>
+            <Rod a={[0, -0.02, 0]} b={[0, 0.95, 0]} r={0.018} m={MAT.steel} />
+            <mesh position={[0.1, -0.1, 0]} scale={[1, 0.5, 1]}><sphereGeometry args={[0.1, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2]} /><primitive object={MAT.steel} attach="material" /></mesh>
+          </group>
+        </group>
+      </group>
+    </group>
+    <IoLabel get={(io) => {
+      const powder = io.ss('material', io.opt('material')).includes('粉');
+      const ran = io.n('run') > 0;
+      const safe = ran ? startedSafely.current : io.sb('safeTransfer', true);
+      return `${powder ? '药匙送粉末' : '镊子夹块状'}：${!ran ? '先横放，再按「开始实验」' : safe ? powder ? '送至管底，再缓慢竖起' : '放在管口，缓慢竖起' : powder ? '未横放，粉末可能沾管口' : '竖直投入，易砸坏管底'}`;
+    }} p={[0.2, 0.35, 0.85]} size={0.17} />
+    <Label text={`试管倾角 = 与竖直方向夹角`} p={[0.2, 0.0, 0.85]} size={0.17} color="#6b553c" />
+  </group>;
 }
 
 function SolutionRig({ exp }: { exp: Experiment }) {
@@ -207,15 +280,64 @@ function CrystalDisplay({ p }: { p: V3 }) {
 function CombustionRig({ exp }: { exp: Experiment }) {
   const v = exp.sceneVariant;
   const sulfur = v.includes('sulfur'); const iron = v.includes('iron');
-  if (v === 'candle-products-smoke') return <group><Heading exp={exp} note="蜡烛燃烧 · 水与二氧化碳检验" /><Candle p={[-0.75, 0, 0]} /><Vessel kind="bell" p={[-0.75, 0.48, 0]} r={0.55} h={1.4} /><ReactiveVessel p={[0.9, 0, 0]} r={0.45} h={1.1} liquid="clear" /><Label text="烧杯水珠 / 石灰水检验" p={[0.2, 1.8, 0.4]} size={0.2} /><IoLabel get={(io) => io.ss('phase', '点燃前')} p={[-0.5, 2.15, 0.35]} size={0.18} /></group>;
-  return <group><Heading exp={exp} note="燃烧条件 · 产物观察" /><Vessel kind="jar" p={[-0.7, 0, 0]} r={0.58} h={1.75} level={0.06} liquid="#d6eaf0" />{iron ? <><Rod a={[-0.7, 1.2, 0]} b={[-0.7, 0.86, 0]} r={0.04} m={MAT.steel} /><Flame kind="sparks" stateKey="sparks" p={[-0.7, 1.3, 0]} /><Ball p={[-0.7, 0.2, 0]} r={0.16} m={MAT.black} /></> : <><Rod a={[-0.7, 1.2, 0]} b={[-0.7, 0.86, 0]} r={0.04} m={MAT.darkSteel} /><Flame p={[-0.7, 1.3, 0]} kind={sulfur ? 'sulfur' : 'fire'} /></>}<ReactiveVessel kind="beaker" p={[0.9, 0, 0]} r={0.52} h={1.2} liquid={sulfur ? 'pale-cloudy' : 'clear'} /><Tube pts={[[-0.7, 1.15, 0], [0, 1.55, 0], [0.65, 1.0, 0]]} r={0.035} m={MAT.glass} /><GasBubbles p={[0.8, 0.3, 0]} height={0.55} /><Label text={sulfur ? '空气淡蓝 · 氧气蓝紫' : iron ? '铁丝火星 · 黑色产物' : '燃烧需要氧气与着火点'} p={[0, 2.25, 0.4]} size={0.19} /></group>;
+  if (v === 'candle-products-smoke') return <CandleRig exp={exp} />;
+  return <group><Heading exp={exp} note="燃烧条件 · 产物观察" /><Vessel kind="jar" p={[-0.7, 0, 0]} r={0.58} h={1.75} level={0.06} liquid="#d6eaf0" />{iron ? <><Rod a={[-0.7, 1.2, 0]} b={[-0.7, 0.86, 0]} r={0.04} m={MAT.steel} /><Sparks p={[-0.7, 1.3, 0]} when={(io) => io.sb('sparks', false)} /><Ball p={[-0.7, 0.2, 0]} r={0.16} m={MAT.black} /></> : <><Rod a={[-0.7, 1.2, 0]} b={[-0.7, 0.86, 0]} r={0.04} m={MAT.darkSteel} /><Flame p={[-0.7, 1.3, 0]} kind={sulfur ? 'sulfur' : 'fire'} /></>}<ReactiveVessel kind="beaker" p={[0.9, 0, 0]} r={0.52} h={1.2} liquid={sulfur ? 'pale-cloudy' : 'clear'} /><Tube pts={[[-0.7, 1.15, 0], [0, 1.55, 0], [0.65, 1.0, 0]]} r={0.035} m={MAT.glass} /><GasBubbles p={[0.8, 0.3, 0]} height={0.55} /><Label text={sulfur ? '空气淡蓝 · 氧气蓝紫' : iron ? '铁丝火星 · 黑色产物' : '燃烧需要氧气与着火点'} p={[0, 2.25, 0.4]} size={0.19} /></group>;
+}
+
+const CANDLE_X = -0.55;
+// 烧杯内壁（倒扣后的局部坐标，y=0 为杯底/朝上）的水珠位置：杯底一圈 + 侧壁
+const WALL_SPOTS: V3[] = Array.from({ length: 16 }, (_, i) => {
+  const a = i * 2.4;
+  return i < 6 ? [Math.cos(a) * 0.3 * (0.4 + (i % 3) * 0.3), 0.05, Math.sin(a) * 0.3 * (0.4 + (i % 3) * 0.3)] as V3 : [Math.cos(a) * 0.46, 0.15 + (i % 5) * 0.14, Math.sin(a) * 0.46] as V3;
+});
+
+function CandleRig({ exp }: { exp: Experiment }) {
+  const cover = useRef<THREE.Group>(null);
+  const film = useRef<THREE.Mesh>(null);
+  const filmMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#f6f4ec', transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), []);
+  useEffect(() => () => filmMat.dispose(), [filmMat]);
+  useRig((io) => {
+    const stage = io.ss('phase', '点燃前');
+    const burning = io.sb('flame', false);
+    const limewater = io.ss('test', '').includes('石灰水');
+    // 点燃时烧杯罩在火焰上方；其余阶段放回桌面，杯壁保留已有现象
+    const x = io.damp('coverX', burning ? CANDLE_X : 1.15, 5);
+    const y = io.damp('coverY', burning ? 1.98 : 1.12, 5);
+    cover.current?.position.set(x, y, 0);
+    const fog = io.damp('fog', stage.includes('点燃前') ? 0 : 1, 0.7);
+    if (film.current) film.current.visible = limewater;
+    filmMat.color.set(fog > 0.3 ? '#f6f4ec' : '#cfe9f2');
+    filmMat.opacity = limewater ? 0.14 + fog * 0.5 : 0;
+  });
+  return <group>
+    <Heading exp={exp} note="蜡烛燃烧 · 水与二氧化碳检验" />
+    <Cyl p={[CANDLE_X, 0.04, 0]} r={0.34} h={0.08} m={MAT.card} />
+    <Candle p={[CANDLE_X, 0.08, 0]} />
+    <Smoke p={[CANDLE_X, 0.7, 0]} amount={(io) => io.ss('smoke', 'none') === 'white-vapor' ? 1 : 0} rise={1.0} spread={0.07} size={0.06} opacity={0.45} />
+    <Match to={[CANDLE_X, 0.68, 0]} />
+    <group ref={cover} position={[1.15, 1.12, 0]}>
+      <group rotation={[Math.PI, 0, 0]}>
+        <Vessel kind="beaker" r={0.5} h={1.1} />
+        <mesh ref={film} position={[0, 0.5, 0]} material={filmMat} visible={false}><cylinderGeometry args={[0.47, 0.47, 0.96, 24, 1, true]} /></mesh>
+        <Beads spots={WALL_SPOTS} amount={(io) => io.damp('beads', io.ss('test', '').includes('石灰水') || io.ss('phase', '点燃前').includes('点燃前') ? 0 : 1, 0.7)} />
+      </group>
+    </group>
+    <IoLabel get={(io) => io.ss('test', '干燥烧杯') + (io.ss('test', '').includes('石灰水') ? '：浑浊检验 CO₂' : '：水珠检验 H₂O')} p={[1.15, 0.3, 0.7]} size={0.19} />
+    <IoLabel get={(io) => { const stage = io.ss('phase', '点燃前'); return io.n('ignite') > 0 && stage.includes('点燃前') ? '点燃前（把观察阶段切到「燃烧中」）' : stage; }} p={[-0.3, 2.45, 0.35]} size={0.2} />
+    <Label text="石蜡 + O₂ → CO₂ + H₂O（定性）" p={[0, 0.0, 0.85]} size={0.17} color="#6b553c" />
+  </group>;
 }
 
 export function ChemicalRig({ exp }: { exp: Experiment }): ReactElement | null {
   if (!exp.bookId.startsWith('chemistry-')) return null;
   const v = exp.sceneVariant;
   let scene: ReactElement;
-  if (v === 'water-electrolysis' || v === 'water-composition-change-practical') scene = <ElectricityRig exp={exp} />;
+  if (v === 'acid-appearance') scene = <AcidAppearanceRig exp={exp} />;
+  else if (v === 'sulfuric-acid-dehydration') scene = <SulfuricDehydrationRig exp={exp} />;
+  else if (v === 'copper-sulfate-concentration-comparison') scene = <CopperConcentrationRig exp={exp} />;
+  else if (v === 'metal-activity-displacement') scene = <MetalActivityRig exp={exp} />;
+  else if (v === 'water-ethanol-oil-mixing') scene = <WaterEthanolRig />;
+  else if (v === 'water-electrolysis' || v === 'water-composition-change-practical') scene = <ElectricityRig exp={exp} />;
   else if (exp.family === 'chemical-gas') scene = <GasRig exp={exp} />;
   else if (exp.family === 'acid-base') scene = <IndicatorRig exp={exp} />;
   else if (exp.family === 'heat') scene = <HeatRig exp={exp} />;

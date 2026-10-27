@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { books } from '../src/data/books';
 import { simulate } from '../src/sim/registry';
 import { emptyAction, type Observation } from '../src/sim/core';
+import { CHEMISTRY_MODEL_LIMITS } from '../src/sim/chemistry';
 
 const all = books.flatMap(b=>b.experiments);
 let passed=0; const failures:string[]=[];
@@ -43,16 +44,100 @@ test('仅短接串联L1时L2仍限流',()=>{const before=observe('bulb-short-cir
 test('提前返回的各电路分支也服从断开开关',()=>{for(const v of ['series-voltage-law','parallel-voltage-law','resistance-length','resistance-area','rheostat-control','bulb-short-circuit','series-parallel-switches','fuse-wire']){const o=observe(v,{}, {toggle:1});assert.equal(o.state.closed,false,v);near(num(o,'current'),0);near(num(o,'power'),0);assert.equal(o.state.bulbOn,false);}});
 test('并联断开时两个支路电流同时为零',()=>{const o=observe('parallel-current-law',{}, {toggle:1});near(num(o,'current1'),0);near(num(o,'current2'),0);assert.equal(o.readings.find(r=>r.label==='支路1电流')?.value,'0 A')});
 test('导体长度与截面积同时参与相对电阻',()=>{for(const v of ['resistance-length','resistance-area'])near(num(observe(v,{length:100,area:2}),'resistanceRatio'),1)});
-test('木条在氧气燃旺而在CO2熄灭',()=>{assert.equal(observe('oxygen-carbon-dioxide-splint',{gas:0}).state.flame,true);assert.equal(observe('oxygen-carbon-dioxide-splint',{gas:1}).state.flame,false)});
-test('确认纯净且点燃的氢气显示燃烧与水生成',()=>{const a=observe('hydrogen-combustion-water',{gas:1,purity:0}),b=observe('hydrogen-combustion-water',{gas:1,purity:1});assert.equal(a.state.flame,false);assert.equal(b.state.flame,true);assert.equal(b.state.gas,'H₂O')});
+test('木条在氧气燃旺而在CO2熄灭',()=>{assert.equal(observe('oxygen-carbon-dioxide-splint',{gas:0},{ignite:1}).state.flame,true);assert.equal(observe('oxygen-carbon-dioxide-splint',{gas:1},{ignite:1}).state.flame,false)});
+test('确认纯净且点燃的氢气显示燃烧与水生成',()=>{const a=observe('hydrogen-combustion-water',{gas:1,purity:0},{add:1}),b=observe('hydrogen-combustion-water',{gas:1,purity:1},{add:1});assert.equal(a.state.flame,false);assert.equal(b.state.flame,true);assert.equal(b.state.gas,'H₂O')});
 test('观察动作不点燃且第二次点燃动作能熄灭',()=>{assert.equal(observe('sulfur-burning',{}, {observe:1}).state.flame,false);assert.equal(observe('sulfur-burning',{}, {ignite:1}).state.flame,true);assert.equal(observe('sulfur-burning',{}, {ignite:2}).state.flame,false)});
 test('金属酸反应方程按样品变化',()=>{for(const [metal,symbol]of [[0,'Mg'],[1,'Zn'],[2,'Fe']] as const){const o=observe('metals-acid-hydrogen',{metal},{add:1});assert(String(o.state.formula).startsWith(symbol+' +'));assert.equal(o.state.gas,'H₂')}assert.equal(observe('metals-acid-hydrogen',{metal:3},{add:1}).state.gas,'none')});
 test('未罩住的酚酞仍无色',()=>assert.equal(observe('ammonia-diffusion-phenolphthalein',{cover:0}).state.liquidColor,'colorless'));
 test('小孔变大亮度示意应增加',()=>assert(num(observe('pinhole-camera',{aperture:2}),'imageBrightness')>num(observe('pinhole-camera',{aperture:1}),'imageBrightness')));
 test('气体扩散对象与教材二氧化氮一致',()=>assert(observe('gas-diffusion').phenomenon.includes('二氧化氮')));
 
-test('带火星木条氧气复燃状态兼容火焰装置',()=>{const air=observe('glowing-splint-oxygen',{gas:0}),oxygen=observe('glowing-splint-oxygen',{gas:1});assert.equal(air.state.flame,false);assert.equal(oxygen.state.flame,true);assert.equal(oxygen.state.glowingSplint,true)});
+test('带火星木条氧气复燃状态兼容火焰装置',()=>{const air=observe('glowing-splint-oxygen',{gas:0},{ignite:1}),oxygen=observe('glowing-splint-oxygen',{gas:1},{ignite:1});assert.equal(air.state.flame,false);assert.equal(oxygen.state.flame,true);assert.equal(oxygen.state.glowingSplint,true)});
 test('红磷模型名称与教材一致并响应熄灭',()=>{const lit=observe('phosphorus-air-volume',{}, {ignite:1}),off=observe('phosphorus-air-volume',{}, {ignite:2});assert(lit.phenomenon.includes('红磷'));assert(!lit.phenomenon.includes('白磷'));assert.equal(lit.state.flame,true);assert.equal(off.state.flame,false)});
+
+// 化学的行为验收明确区分“设置加入量”和“已经加入”。
+test('默认药量不提前生成沉淀，观察或搅拌不能代替加入',()=>{for(const v of ['copper-hydroxide-precipitate','copper-hydroxide-heating','sodium-carbonate-limewater','copper-sulfate-precipitates']){for(const counts of [{},{observe:1},{stir:1}] as Record<string,number>[])assert.equal(observe(v,{},counts).state.precipitateColor,'none',v);assert.notEqual(observe(v,{}, {add:1}).state.precipitateColor,'none',v)}});
+test('零药量不能被加入动作变成沉淀或气体',()=>{for(const [v,key] of [['copper-hydroxide-precipitate','amount'],['copper-hydroxide-heating','amount'],['sodium-carbonate-limewater','amount'],['marble-acid-open-tube','amount'],['carbonate-powder-acid','volume'],['carbonate-acid-limewater','acid'],['peroxide-catalyst','amount']]){const o=observe(v,{[key]:0},{add:1});assert.equal(o.state.precipitateColor,'none',v);assert.equal(o.state.gas,'none',v);near(num(o,'bubbles'),0)}});
+test('过氧化氢无催化剂仍能缓慢分解且催化后加快',()=>{const slow=observe('peroxide-catalyst',{catalyst:0},{add:1}),fast=observe('peroxide-catalyst',{catalyst:1},{add:1});assert.equal(slow.state.gas,'O₂');assert(num(slow,'bubbles')>0);assert(num(fast,'bubbles')>num(slow,'bubbles'));});
+test('高锰酸钾制氧先排空气再收集',()=>{const idle=observe('permanganate-water-collection',{}, {collect:1}),purge=observe('permanganate-water-collection',{collection:0},{add:1,collect:1}),collected=observe('permanganate-water-collection',{collection:1},{add:1,collect:1});near(num(idle,'bubbles'),0);assert.equal(purge.state.gasReady,false);assert.equal(collected.state.gasReady,true);near(num(observe('permanganate-water-collection',{heating:0},{add:1}),'bubbles'),0)});
+test('碳酸钠与碳酸氢钠各用正确盐酸反应式',()=>{const a=observe('carbonate-acid-limewater',{material:0},{add:1}),b=observe('carbonate-acid-limewater',{material:1},{add:1});assert(String(a.state.formula).startsWith('Na₂CO₃ + 2HCl'));assert(String(b.state.formula).startsWith('NaHCO₃ + HCl'));assert.equal(a.state.gas,'CO₂');assert.equal(b.state.gas,'CO₂')});
+test('铁丝在空气中不伪造纯氧火星现象',()=>{const a=observe('iron-sparks-oxygen',{gas:0},{ignite:1}),b=observe('iron-sparks-oxygen',{gas:1},{ignite:1});assert.equal(a.state.sparks,false);assert.equal(a.state.flame,false);assert.equal(b.state.sparks,true);assert.equal(b.state.blackSolid,true)});
+test('红磷漏气仍可燃烧但不能读出氧含量',()=>{const o=observe('phosphorus-air-volume',{sealed:0},{ignite:1});assert.equal(o.state.flame,true);near(num(o,'waterRise'),0);near(num(observe('phosphorus-air-volume',{sealed:1,cooled:1},{ignite:1}),'waterRise'),0);near(num(observe('phosphorus-air-volume',{sealed:1,cooled:1},{ignite:2}),'waterRise'),.21)});
+test('蜡烛检验区分水珠与石灰水',()=>{const water=observe('candle-products-smoke',{test:0},{ignite:1}),co2=observe('candle-products-smoke',{test:1},{ignite:1});assert.equal(water.state.detectedProduct,'H₂O');near(num(water,'waterDrops'),1);assert.equal(co2.state.detectedProduct,'CO₂');assert.equal(co2.state.precipitateColor,'white');assert.equal(observe('candle-products-smoke',{}, {ignite:2}).state.flame,false)});
+test('电解水需开始与导电电源条件且两极气体2比1',()=>{for(const values of [{power:0,electrolyte:1},{power:1,electrolyte:0}])near(num(observe('water-electrolysis',values,{add:1}),'bubbles'),0);const o=observe('water-electrolysis',{power:1,electrolyte:1},{add:1});near(num(o,'hydrogenVolume'),2*num(o,'oxygenVolume'));assert.equal(o.state.cathodeGas,'H₂');assert.equal(o.state.anodeGas,'O₂')});
+test('水未沸腾也可蒸发，常压100℃才显示沸腾气泡',()=>{const warm=observe('water-boiling-condensation',{temperature:60},{run:1}),boil=observe('water-boiling-condensation',{temperature:100},{run:1});near(num(warm,'bubbles'),0);assert(num(warm,'vapor')>0);assert(num(warm,'waterDrops')>0);assert(num(boil,'bubbles')>0);assert.equal(boil.state.boiling,true)});
+test('浓硫酸对纸木布均先接触后炭化',()=>{for(const material of [0,1,2]){assert.equal(observe('sulfuric-acid-dehydration',{material}).state.charred,false);assert.equal(observe('sulfuric-acid-dehydration',{material},{observe:1}).state.charred,false);const o=observe('sulfuric-acid-dehydration',{material},{add:1});assert.equal(o.state.charred,true);assert.equal(o.state.solidColor,'black')}});
+test('硫酸铜用量按标签映射且蓝色随实际质量变深',()=>{const values=[0,1,2].map(copperMass=>observe('copper-sulfate-concentration-comparison',{copperMass},{add:1}));near(num(values[0],'copperMass'),.1);near(num(values[1],'copperMass'),.5);near(num(values[2],'copperMass'),2);assert(num(values[0],'colorIntensity')<num(values[1],'colorIntensity'));assert(num(values[1],'colorIntensity')<num(values[2],'colorIntensity'));assert.equal(observe('copper-sulfate-concentration-comparison').state.liquidColor,'clear')});
+test('三组金属活动性置换含不反应对照',()=>{const a=observe('metal-activity-displacement',{pair:0},{add:1}),b=observe('metal-activity-displacement',{pair:1},{add:1}),c=observe('metal-activity-displacement',{pair:2},{add:1});assert.equal(a.state.reacted,true);assert.equal(a.state.precipitateColor,'copper-red');assert(String(a.state.formula).startsWith('2Al + 3CuSO₄'));assert.equal(b.state.reacted,true);assert.equal(b.state.precipitateColor,'silver');assert.equal(b.state.liquidColor,'blue');assert.equal(c.state.reacted,false);assert.equal(c.state.liquidColor,'clear');assert.equal(observe('metal-activity-displacement').state.reacted,false)});
+test('乙醇先加入后振荡，初始红水不会凭空出现乙醇层',()=>{const initial=observe('water-ethanol-oil-mixing'),layered=observe('water-ethanol-oil-mixing',{}, {add:1}),mixed=observe('water-ethanol-oil-mixing',{}, {add:1,stir:1});assert.equal(initial.state.liquidColor,'red');near(num(initial,'layers'),1);assert.equal(initial.state.ethanolAdded,false);near(num(layered,'layers'),2);assert.equal(layered.state.miscible,false);near(num(mixed,'layers'),1);assert.equal(mixed.state.miscible,true)});
+test('肥皂水为碱性，滴加后石蕊蓝酚酞粉红',()=>{const litmus=observe('indicators-acid-base',{solution:1,indicator:0},{add:1}),phenol=observe('indicators-acid-base',{solution:1,indicator:1},{add:1});assert.equal(litmus.state.basic,true);assert.equal(litmus.state.liquidColor,'blue');assert.equal(phenol.state.liquidColor,'pink');assert.equal(observe('limewater-phenolphthalein',{amount:0,pH:12},{add:1}).state.liquidColor,'clear')});
+test('石蕊纸花四组对照只在水和CO2共存时变红',()=>{for(const paper of [0,1,2,3])assert.equal(observe('co2-water-litmus',{paper},{add:1}).state.liquidColor,paper===3?'red':'purple')});
+test('中和当量点由明确示例配比决定且过量酸不伪称中性',()=>{const before=observe('neutralization-phenolphthalein',{acid:10}),base=observe('neutralization-phenolphthalein',{acid:4},{add:1}),equal=observe('neutralization-phenolphthalein',{acid:5},{add:1}),acid=observe('neutralization-phenolphthalein',{acid:10},{add:1});near(num(before,'acidVolume'),0);assert(num(base,'pH')>7);assert.equal(base.state.liquidColor,'pink');near(num(equal,'pH'),7);assert.equal(equal.state.liquidColor,'colorless');assert(num(acid,'pH')<7);assert.equal(acid.state.neutralized,false);assert(acid.warnings.some(w=>w.includes('演示设定')))});
+test('食盐溶解守恒，硝酸钾加热能减少未溶固体',()=>{const salt=observe('sodium-chloride-solubility',{salt:8},{add:1});near(num(salt,'dissolved')+num(salt,'undissolved'),8);assert(num(salt,'undissolved')>0);const cold=observe('potassium-nitrate-solubility',{temperature:20,solute:8},{add:1}),hot=observe('potassium-nitrate-solubility',{temperature:70,solute:8},{add:1});assert(num(hot,'dissolved')>num(cold,'dissolved'));near(num(hot,'undissolved'),0);near(num(observe('calcium-hydroxide-solubility',{water:0},{add:1}),'dissolved'),0)});
+test('硫酸铜两种沉淀颜色不同且钡盐上清仍有铜离子',()=>{const a=observe('copper-sulfate-precipitates',{reagent:0},{add:1}),b=observe('copper-sulfate-precipitates',{reagent:1},{add:1});assert.equal(a.state.precipitateColor,'blue');assert.equal(b.state.precipitateColor,'white');assert.equal(b.state.liquidColor,'blue')});
+test('浓硫酸两种混合顺序都放热，水入酸另报危险',()=>{for(const order of [0,1]){const o=observe('sulfuric-acid-dilution',{order},{run:1});assert(num(o,'temperatureChange')>0);assert.equal(o.state.safeOrder,order===1)}assert(observe('sulfuric-acid-dilution',{order:0},{run:1}).warnings.some(w=>w.includes('危险')))});
+test('零水量不发生生石灰放热，NaOH固态观察不显示溶解热',()=>{near(num(observe('quicklime-water-exothermic',{water:0},{run:1}),'temperatureChange'),0);near(num(observe('sodium-hydroxide-dissolution',{stage:0},{run:1}),'temperatureChange'),0);assert(num(observe('sodium-hydroxide-dissolution',{stage:1},{run:1}),'temperatureChange')>0)});
+test('铁锈蚀需水和空气并经过观察阶段',()=>{for(const condition of [0,1,2]){const initial=observe('iron-rust-conditions',{condition},{add:1});near(num(initial,'rust'),0);const later=observe('iron-rust-conditions',{condition},{add:1,observe:1});near(num(later,'rust'),condition===2?1:0);if(condition===1)assert.equal(later.state.oxygenPresent,false)}});
+test('质量守恒不捏造样品质量且开放产气装置所称质量减少',()=>{const open=observe('mass-conservation-open-closed',{container:0},{run:1}),closed=observe('mass-conservation-open-closed',{container:1},{run:1});assert.equal(open.state.massChange,'decrease');assert.equal(closed.state.massChange,'unchanged');assert.equal(open.state.massConserved,true);assert(!('massBefore' in open.state));assert(!('massAfter' in open.state));assert.equal(observe('magnesium-combustion-mass',{system:0},{run:1}).state.massChange,'increase')});
+test('固体横放取用后缓慢竖起不会撤销已放入状态',()=>{for(const material of [0,1]){assert.equal(observe('solid-reagent-transfer',{tilt:90,material}).state.safeTransfer,true);assert.equal(observe('solid-reagent-transfer',{tilt:0,material}).state.safeTransfer,false);assert.equal(observe('solid-reagent-transfer',{tilt:0,material},{run:1}).state.transferred,true)}});
+test('CO2低处先熄与继续倾倒阶段有区别',()=>{const start=observe('co2-extinguishes-candles'),low=observe('co2-extinguishes-candles',{}, {add:1}),both=observe('co2-extinguishes-candles',{}, {add:1,collect:1});assert.equal(start.state.lowerCandle,true);assert.equal(low.state.lowerCandle,false);assert.equal(low.state.upperCandle,true);assert.equal(both.state.upperCandle,false)});
+
+const chemistry = all.filter(e=>e.bookId.startsWith('chemistry-'));
+let chemistryMatrixCases = 0;
+test('化学80项均有独立审查记录，观察/记录/收集不触发首次反应',()=>{
+ assert.equal(chemistry.length,80);
+ for(const exp of chemistry){
+  assert(CHEMISTRY_MODEL_LIMITS[exp.sceneVariant],exp.id+'缺简化记录');
+  const params=Object.fromEntries(exp.parameters.map(p=>[p.key,p.default]));
+  const idle=simulate(exp,params,10,emptyAction());
+  assert.equal(idle.state.modelReviewed,true,exp.id+'未覆盖');
+  for(const action of ['observe','record','collect']){
+   const o=simulate(exp,params,10,{id:action,t:10,counts:{[action]:1}});
+   assert.deepEqual(o.state,idle.state,exp.id+'/'+action+'不应代替加入或开始');
+  }
+ }
+});
+test('化学80项的全部参数选项/单变量边界与动作组合输出有限',()=>{
+ for(const exp of chemistry){
+  const defaults=Object.fromEntries(exp.parameters.map(p=>[p.key,p.default]));
+  const variants=[defaults,...exp.parameters.flatMap(p=>(p.options?.map(o=>o.value)??[p.min,p.max]).map(value=>({...defaults,[p.key]:value})))];
+  const primary=exp.actions[0]?.id??'run';
+  for(const params of variants)for(const counts of [{},{[primary]:1},{[primary]:2},{[primary]:1,observe:1,stir:1,collect:1}])for(const time of [0,10]){
+   const o=simulate(exp,params,time,{id:primary,t:0,counts});chemistryMatrixCases++;
+   assert(o.phenomenon.trim(),exp.id);assert.equal(o.state.modelReviewed,true,exp.id);
+   for(const [key,value]of Object.entries(o.state)){if(typeof value==='number')assert(Number.isFinite(value),exp.id+'/'+key);if(Array.isArray(value))assert(value.every(Number.isFinite),exp.id+'/'+key)}
+  }
+ }
+});
+if(process.argv.includes('--chemistry-report'))console.log(JSON.stringify({chemistryAudit:chemistry.map(e=>({id:e.id,title:e.title,variant:e.sceneVariant,limits:CHEMISTRY_MODEL_LIMITS[e.sceneVariant]}))},null,2));
+
+test('浓盐酸开瓶形成白雾而浓硫酸无白雾，白雾不写成烟',()=>{
+ const initial=observe('acid-appearance',{acid:0}),observed=observe('acid-appearance',{acid:0},{observe:1}),hcl=observe('acid-appearance',{acid:0},{run:1}),sulfuric=observe('acid-appearance',{acid:1},{run:1});
+ assert.equal(initial.state.bottleOpen,false);assert.equal(initial.state.whiteMist,false);assert.equal(observed.state.whiteMist,false);
+ assert.equal(hcl.state.whiteMist,true);assert.equal(hcl.state.mist,'white');assert.equal(hcl.state.smoke,'none');assert(hcl.phenomenon.includes('小液滴'));assert.equal(sulfuric.state.whiteMist,false);
+});
+test('CO2综合实验石蕊通气变红，停止通气加热后恢复紫色',()=>{
+ const e=all.find(e=>e.sceneVariant==='co2-preparation-properties-practical')!;const option=e.parameters.find(p=>p.key==='test')!.options!.find(o=>o.label==='紫色石蕊')!;assert(option,'数据应接入紫色石蕊');
+ const initial=observe(e.sceneVariant,{test:option.value,litmusHeat:1}),red=observe(e.sceneVariant,{test:option.value,litmusHeat:0},{add:1}),purple=observe(e.sceneVariant,{test:option.value,litmusHeat:1},{add:1});
+ assert.equal(initial.state.liquidColor,'purple');assert.equal(initial.state.litmusRestored,false);assert.equal(red.state.liquidColor,'red');assert.equal(red.state.gasFlowingToLitmus,true);
+ assert.equal(purple.state.liquidColor,'purple');assert.equal(purple.state.litmusRestored,true);assert.equal(purple.state.carbonicAcidDecomposed,true);assert.equal(purple.state.gasFlowingToLitmus,false);assert(purple.phenomenon.includes('停止通气'));
+});
+test('碱通CO2区分石灰水白色沉淀和NaOH无明显现象',()=>{
+ const test=all.find(e=>e.sceneVariant==='base-properties-comparison')!.parameters.find(p=>p.key==='test')!.options!.find(o=>o.label==='二氧化碳')!.value;
+ const calcium=observe('base-properties-comparison',{base:1,test},{add:1}),sodium=observe('base-properties-comparison',{base:0,test},{add:1}),idle=observe('base-properties-comparison',{base:1,test});
+ assert.equal(calcium.state.precipitateColor,'white');assert(String(calcium.state.formula).includes('CaCO₃↓'));assert.equal(sodium.state.precipitateColor,'none');assert.equal(sodium.state.reacted,true);assert.equal(sodium.state.liquidColor,'clear');assert(String(sodium.state.formula).includes('2NaOH'));assert(sodium.phenomenon.includes('无明显'));assert.equal(idle.state.reacted,false);
+});
+test('镁锌铁与两种稀酸生成对应盐，铜均不产氢',()=>{
+ const sulfate=['Mg + H₂SO₄ → MgSO₄ + H₂↑','Zn + H₂SO₄ → ZnSO₄ + H₂↑','Fe + H₂SO₄ → FeSO₄ + H₂↑'];
+ for(const acid of [0,1])for(const metal of [0,1,2,3]){
+  const idle=observe('metals-acid-hydrogen',{acid,metal}),o=observe('metals-acid-hydrogen',{acid,metal},{add:1});assert.equal(idle.state.gas,'none');
+  assert.equal(o.state.gas,metal===3?'none':'H₂');if(metal===3)near(num(o,'bubbles'),0);else if(acid===1)assert.equal(o.state.formula,sulfate[metal]);else assert(String(o.state.formula).includes('2HCl'));
+ }
+});
+test('喷水通CO2纸花取出吹干后碳酸分解并恢复紫色',()=>{
+ const e=all.find(e=>e.sceneVariant==='co2-water-litmus')!,paper=e.parameters.find(p=>p.key==='paper')!.options!.find(o=>o.label==='喷水后通CO₂再吹干')!;assert(paper,'数据应提供教材吹干阶段');
+ const wet=observe(e.sceneVariant,{paper:3},{add:1}),dry=observe(e.sceneVariant,{paper:paper.value},{add:1});assert.equal(wet.state.liquidColor,'red');assert.equal(dry.state.liquidColor,'purple');assert.equal(dry.state.restored,true);assert.equal(dry.state.wet,false);assert.equal(dry.state.carbonDioxideReleased,true);assert.equal(dry.state.formula,'H₂CO₃ → CO₂↑ + H₂O');assert(dry.phenomenon.includes('吹风机'));assert.equal(observe(e.sceneVariant,{paper:paper.value}).state.restored,false);
+});
 
 // 所有实际条目都应能在UI允许的默认/最小/最大输入下产生有限状态。
 for(const exp of all){
@@ -62,5 +147,5 @@ for(const exp of all){
   catch(err){failures.push(`${exp.id}/${mode}: ${String(err)}`)}
  }
 }
-console.log(JSON.stringify({acceptancePassed:passed,acceptanceFailed:failures.length,experiments:all.length,boundaryCases:all.length*3,failures},null,2));
+console.log(JSON.stringify({acceptancePassed:passed,acceptanceFailed:failures.length,experiments:all.length,boundaryCases:all.length*3,chemistryActivities:chemistry.length,chemistryMatrixCases,failures},null,2));
 process.exitCode=failures.length?1:0;

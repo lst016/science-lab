@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Experiment, ExperimentParameter } from '../data/types';
 import { emitTimeUpdate, observe, rt, setParam, subscribe, triggerAction, useActionState, useParams } from '../state/runtime';
 import type { Observation } from '../sim/core';
+import { CHEMISTRY_MODEL_LIMITS } from '../sim/chemistry';
 
 const FIDELITY: Record<Observation['fidelity'], string> = {
   quantitative: '定量教学模型：读数由公式计算',
@@ -164,6 +165,7 @@ export function LeftPage({ exp, indexLabel }: { exp: Experiment; indexLabel: str
             <p className="formula-inline">{exp.model.formula}</p>
             <h3 className="sub">适用限制</h3>
             <p>{exp.model.limits}</p>
+            {exp.bookId.startsWith('chemistry-') && <p>{CHEMISTRY_MODEL_LIMITS[exp.sceneVariant] ?? '此实验的独立模型仍待核查。'}</p>}
             <p className="note">界面上的读数是教学模型的输出，不是实际测量记录；化学现象用条件—现象的状态描述，不给出反应速率。</p>
           </>
         )}
