@@ -206,10 +206,12 @@ function LampFlame() {
       <Ball p={[0, 0.42, 0]} r={0.06} m={MAT.glass} />
     </Mv>
     {/* 部位标签与引线 */}
-    {[{ y: WICK + 0.8, x: 0.02 }, { y: WICK + 0.48, x: 0.06 }, { y: WICK + 0.13, x: 0.03 }].map((q, i) => <group key={i}>
-      <Rod a={[-0.3 + q.x, q.y, 0]} b={[1.1, q.y, 0]} r={0.008} m={MAT.black} cast={false} />
-      <IoLabel p={[1.5, q.y, 0]} size={0.22} color={['#a33a1b', '#b2621c', '#2e4fae'][i]} get={(io) => (io.idx('zone') === i ? '▶ ' : '') + ZONES[i].name} />
-    </group>)}
+    <Mv upd={(g, io) => { g.visible = io.sb('flame', false); }}>
+      {[{ y: WICK + 0.8, x: 0.02 }, { y: WICK + 0.48, x: 0.06 }, { y: WICK + 0.13, x: 0.03 }].map((q, i) => <group key={i}>
+        <Rod a={[-0.3 + q.x, q.y, 0]} b={[1.1, q.y, 0]} r={0.008} m={MAT.black} cast={false} />
+        <IoLabel p={[1.5, q.y, 0]} size={0.22} color={['#a33a1b', '#b2621c', '#2e4fae'][i]} get={(io) => (io.idx('zone') === i ? '▶ ' : '') + ZONES[i].name} />
+      </group>)}
+    </Mv>
     <Label text="酒精灯" p={[0.75, 0.3, 0.75]} size={0.2} />
     <IoLabel p={[0.9, WICK + 0.02, 0.35]} size={0.17} color="#3a2e20" get={(io) => io.idx('probe') === 1 && io.sb('flame', false) ? '火柴梗' : ' '} />
     <IoLabel p={[0, 3.3, 0]} size={0.22} get={(io) => !io.sb('flame', false) ? '灯帽盖着（熄灭）' : ZONES[io.idx('zone')].name + '：温度' + ['最高', '较高', '最低'][io.idx('zone')] + (io.s('charOuter', 0) > 0.5 ? ' · 外焰处最先炭化' : '')} />
@@ -318,10 +320,38 @@ function AtomModels() {
 const io_sel = (i: number, m: number) => (i === m ? MAT.red : i < m ? MAT.brass : MAT.plastic);
 
 /* ---------- 7 硫酸铜与氢氧化钠反应前后质量 ---------- */
+// 悬浮絮状沉淀颗粒：确定性伪随机分布（x/z 在半径 0.26 内，fy 为液柱内相对高度）
+const FLOCS = Array.from({ length: 24 }, (_, i) => {
+  const rnd = (s: number) => { const v = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return v - Math.floor(v); };
+  const a = rnd(1) * Math.PI * 2, rr = Math.sqrt(rnd(2)) * 0.26;
+  return { x: Math.cos(a) * rr, z: Math.sin(a) * rr, fy: rnd(3), r: 0.035 + rnd(4) * 0.015, ph: rnd(5) * Math.PI * 2, sp: 0.02 + rnd(6) * 0.02 };
+});
 function MassConservation() {
   const hA = (io: RigIO) => io.p('cuso4', 5) / 10 * 0.62, hB = (io: RigIO) => io.p('naoh', 5) / 10 * 0.62;
   const k = (io: RigIO) => Math.sin(Math.PI * clamp(io.s('pour', 0), 0, 1));
   const toHex = (a: string, b: string, t: number) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), clamp(t, 0, 1)).getHexString();
+  const levelB = (io: RigIO) => hB(io) + hA(io) * clamp(io.s('pour', 0), 0, 1);
+  // Lambert 不经过 InkScene 的纸面混色和描边；设为透明并提高 renderOrder，画在半透明液体之后，蓝色沉淀才不被冲淡
+  const floc = useMat(() => new THREE.MeshLambertMaterial({ color: '#1f63cc', transparent: true, opacity: 0.95 }));
+  const settled = useMat(() => new THREE.MeshLambertMaterial({ color: '#1c56b4', transparent: true, opacity: 0.95 }));
+  const flocs = useRef<THREE.Group>(null);
+  const pile = useRef<THREE.Mesh>(null);
+  useRig((io) => {
+    const a = io.damp('pptSettle', io.s('precipitate', 0), 1.5);
+    if (pile.current) { pile.current.visible = a > 0.02; pile.current.scale.set(0.29, 0.13 * clamp(a, 0.05, 1), 0.29); }
+    const g = flocs.current;
+    if (!g) return;
+    const ppt = clamp(io.s('precipitate', 0), 0, 1), l = levelB(io), n = Math.round(ppt * FLOCS.length);
+    g.visible = ppt > 0.01 && l > 0.1;
+    g.children.forEach((c, i) => {
+      const q = FLOCS[i];
+      c.visible = i < n;
+      if (!c.visible) return;
+      // 缓慢下沉，沉到底后回到液面附近；水平方向轻微漂动
+      const f = ((q.fy - io.t * q.sp) % 1 + 1) % 1;
+      c.position.set(q.x + Math.sin(io.t * 0.7 + q.ph) * 0.02, 0.06 + f * (l - 0.1), q.z + Math.cos(io.t * 0.6 + q.ph) * 0.02);
+    });
+  });
   return <group>
     <Balance p={[0, 0, 0]} w={2.8} d={1.5} pan="square" get={(io) => io.s('display', 0).toFixed(2) + ' g'} />
     {/* 烧杯 A（硫酸铜）：倒入时被拿起倾倒，倒完放回 */}
@@ -335,12 +365,17 @@ function MassConservation() {
     </Mv>
     {/* 烧杯 B（氢氧化钠）：生成蓝色沉淀 */}
     <Vessel kind="beaker" p={[0.65, 0.35, 0]} r={0.36} h={0.85} />
-    <Liquid p={[0.65, 0.38, 0]} r={0.33} level={(io) => hB(io) + hA(io) * clamp(io.s('pour', 0), 0, 1)} color={(io) => io.s('pour', 0) > 0.02 ? toHex('#c8e6ee', '#4f93cf', Math.max(io.s('blueness', 0), io.s('precipitate', 0) * 0.7)) : 'clear'} />
-    <Pile p={[0.65, 0.39, 0]} r={0.3} h={0.12} color="#2f6fb5" amount={(io) => Math.min(1, 0.3 + io.s('precipitate', 0)) * (io.s('precipitate', 0) > 0.01 ? 1 : 0)} />
+    {/* 悬浊液略带浅蓝；剩余 Cu²⁺ 越多越蓝 */}
+    <Liquid p={[0.65, 0.38, 0]} r={0.33} level={levelB} color={(io) => io.s('pour', 0) > 0.02 ? toHex('#d2e8f4', '#7fb6e4', Math.max(io.s('blueness', 0), io.s('precipitate', 0) * 0.3)) : 'clear'} />
+    {/* 沉在杯底的絮状沉淀：半球 */}
+    <mesh ref={pile} position={[0.65, 0.39, 0]} material={settled} visible={false} renderOrder={6}><sphereGeometry args={[1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} /></mesh>
+    <group ref={flocs} position={[0.65, 0.38, 0]} visible={false}>
+      {FLOCS.map((q, i) => <mesh key={i} material={floc} visible={false} renderOrder={6}><sphereGeometry args={[q.r * 1.4, 10, 8]} /></mesh>)}
+    </group>
     <Label text="硫酸铜溶液" p={[-1.5, 1.35, 0]} size={0.2} />
     <Label text="NaOH 溶液" p={[1.6, 1.35, 0]} size={0.2} />
     <Label text="电子天平" p={[0.75, 0.2, 0.95]} size={0.18} />
-    <IoLabel p={[0, 3.3, 0]} size={0.22} get={(io) => (io.s('pour', 0) <= 0 ? '反应前' : io.s('pour', 0) < 1 ? '混合中' : '反应后') + ' 总质量 ' + io.s('display', 0).toFixed(2) + ' g（示例）'} />
+    <IoLabel p={[0, 3.3, 0]} size={0.22} get={(io) => (io.s('pour', 0) <= 0 ? '反应前' : io.s('pour', 0) < 1 ? '混合中' : '反应后（生成蓝色絮状沉淀）') + ' 总质量 ' + io.s('display', 0).toFixed(2) + ' g（示例）'} />
   </group>;
 }
 
