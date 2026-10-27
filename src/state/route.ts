@@ -1,13 +1,15 @@
 import { useSyncExternalStore } from 'react';
+import type { Edition } from '../data/types';
 
 /**
  * Hash 路由：
- *   #/                         书库
+ *   #/                         书库（人教版书架）
+ *   #/shanghai                 书库（上海版书架）
  *   #/book/<bookId>            打开某册（恢复上次实验，否则第一条）
  *   #/book/<bookId>/<expId>    定位到具体实验
  */
 export type Route =
-  | { name: 'library' }
+  | { name: 'library'; edition?: Edition }
   | { name: 'book'; bookId: string; expId?: string };
 
 export function parseHash(hash: string): Route {
@@ -21,11 +23,12 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'book' && parts[1]) {
     return { name: 'book', bookId: parts[1], expId: parts[2] };
   }
+  if (parts[0] === 'shanghai') return { name: 'library', edition: 'shanghai' };
   return { name: 'library' };
 }
 
 export function formatHash(route: Route): string {
-  if (route.name === 'library') return '#/';
+  if (route.name === 'library') return route.edition === 'shanghai' ? '#/shanghai' : '#/';
   const base = `#/book/${encodeURIComponent(route.bookId)}`;
   return route.expId ? `${base}/${encodeURIComponent(route.expId)}` : base;
 }

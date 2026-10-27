@@ -8,7 +8,7 @@
     "dev": "vite --host 127.0.0.1 --port 5180",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "tsx scripts/content-audit.ts && tsx scripts/model-acceptance.ts && tsx scripts/camera-fit-check.ts",
+    "test": "tsx scripts/content-audit.ts && tsx scripts/model-acceptance.ts && tsx scripts/sh-check.ts && tsx scripts/camera-fit-check.ts",
     "preview": "vite preview --host 127.0.0.1 --port 5180",
     "audit:parameters": "tsx scripts/parameter-audit.ts",
     "test:camera": "tsx scripts/camera-fit-check.ts"

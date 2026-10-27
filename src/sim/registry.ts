@@ -2,15 +2,19 @@ import type { Experiment } from '../data/types';
 import { ActionState, Observation, buildCtx } from './core';
 import { simulatePhysics } from './physics';
 import { simulateChemistry } from './chemistry';
+import { simulateShanghai } from './shanghai';
 import { MODELED_SCENE_VARIANTS } from './coverage';
 export { getSimulationCoverage } from './coverage';
 
+const NON_CIRCUIT_VARIANTS = new Set(['charge-interaction', 'sh-electroscope-conductor-test']);
+
 export function simulate(exp: Experiment, params: Record<string, number>, time: number, action: ActionState): Observation {
   const ctx = buildCtx(exp, params, time, action);
-  const observation = exp.bookId.startsWith('chemistry-') ? simulateChemistry(ctx) : simulatePhysics(ctx);
+  // 上海版专属变体（sh-*）先匹配，其余按学科交给人教版模型。
+  const observation = simulateShanghai(ctx) ?? (exp.bookId.startsWith('chemistry-') ? simulateChemistry(ctx) : simulatePhysics(ctx));
   // 所有电路变体共用实际开关状态，避免提前返回的分支忽略断开动作。
-  // 静电相互作用不属于导线回路，不套用电路开关。
-  if (exp.family === 'electricity' && exp.sceneVariant !== 'charge-interaction' && (action.counts.toggle ?? 0) % 2 === 1) {
+  // 静电相互作用与验电器连接不属于导线回路，不套用电路开关。
+  if (exp.family === 'electricity' && !NON_CIRCUIT_VARIANTS.has(exp.sceneVariant) && (action.counts.toggle ?? 0) % 2 === 1) {
     Object.assign(observation.state, { closed: false, active: false, current: 0, power: 0, bulbOn: false, phase: '开关断开' });
     for (const key of ['current1', 'current2', 'voltage1', 'voltage2']) {
       if (key in observation.state) observation.state[key] = 0;

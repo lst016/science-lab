@@ -7,6 +7,7 @@ import { ChemicalRig } from './chemical-rigs';
 import { ThermalRig } from './thermal-rigs';
 import { MechanicsRig } from './mechanics';
 import { LensRig, OpticsRig } from './optics';
+import { SH_RIGS } from './shanghai';
 
 /** 每个 family 一个装置路由；返回 null 表示该 sceneVariant 尚无专属装置。 */
 const ROUTES: Partial<Record<Experiment['family'], (exp: Experiment) => ReactElement | null>> = {
@@ -28,13 +29,17 @@ const ROUTES: Partial<Record<Experiment['family'], (exp: Experiment) => ReactEle
 
 export function RigRouter({ exp }: { exp: Experiment }) {
   const route = ROUTES[exp.family];
-  const content = exp.bookId.startsWith('chemistry-')
+  // 上海版待建条目不借用类别通用装置，避免显示与教材不符的器材。
+  const ShRig = SH_RIGS[exp.sceneVariant];
+  const content = exp.implementationStatus === 'rig-pending' ? null
+    : ShRig ? <ShRig exp={exp} />
+    : exp.bookId.startsWith('chemistry-')
     ? <ChemicalRig exp={exp} />
     : route ? route(exp) : null;
   return (
     <group key={exp.id} name="experiment-rig">
       <group position={[0, 0.07, 0]}>
-        {content ?? <Label text={`「${exp.sceneVariant}」暂无专属 3D 装置`} p={[0, 1, 0]} />}
+        {content ?? <Label text={exp.implementationStatus === 'rig-pending' ? '上海版独有活动 · 3D 装置待建，请先看左页步骤' : `「${exp.sceneVariant}」暂无专属 3D 装置`} p={[0, 1, 0]} />}
       </group>
     </group>
   );

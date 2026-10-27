@@ -1,5 +1,6 @@
 import type { SimCtx, Observation } from './core';
 import { clamp, fmt } from './core';
+import { SH_VARIANTS } from '../data/sh-variants';
 
 type State = Observation['state'];
 const opts = (c: SimCtx, key: string, fallback = '') => {
@@ -50,6 +51,8 @@ export const CHEMISTRY_MODEL_LIMITS: Record<string, string> = Object.fromEntries
   [['copper-sulfate-concentration-comparison'], '等量20mL水中加入0.1/0.5/2g无水硫酸铜；颜色深浅为简化显示比例，不是吸光度或实测浓度。'],
   [['metal-activity-displacement'], '铝须除去表面氧化膜才便于观察；只比较三组置换、颜色及表面产物，不计算真实速率与产量。'],
 ].flatMap(([variants, note]) => (variants as string[]).map(variant => [variant, note as string])));
+// 上海版化学专属变体的审查记录随定义一起维护。
+for (const [key, def] of Object.entries(SH_VARIANTS)) if (key.startsWith('chemistry-')) CHEMISTRY_MODEL_LIMITS[def.variant] = def.limits;
 
 function res(c: SimCtx, phenomenon: string, state: State, readings: Observation['readings'] = [], fidelity: Observation['fidelity'] = 'qualitative', warnings: string[] = []): Observation {
   const active = state.active ?? (state.flame === true || state.heating === true || (typeof state.bubbles === 'number' && state.bubbles > 0));

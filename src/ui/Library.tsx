@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { books, coverOf, experimentsOf, getExperiment } from '../app/catalog';
+import type { Edition } from '../data/types';
 import { navigate, readProgress } from '../state/route';
 import type { Book } from '../data/types';
+
+const EDITIONS: { id: Edition; label: string; note: string; hero: string }[] = [
+  { id: 'pep', label: '人教版', note: '六三制', hero: '人教版初中物理与化学 · 互动实验馆' },
+  { id: 'shanghai', label: '上海版', note: '沪科技版 · 五四制', hero: '上海版（沪科技版五四制）初中物理与化学 · 互动实验馆' },
+];
 import { CoverArt } from './CoverArt';
 import { Beaker, BookStack, Cradle, Flask, Molecule, Prism, TubeRack } from './Props';
 
@@ -36,7 +42,7 @@ function BookItem({ book, picked, leaving, resume, onPick }: { book: Book; picke
               <div className="subject">{book.subject === 'physics' ? '物理' : '化学'}</div>
               <div className="vol">{book.grade}{book.volume}</div>
               <CoverArt art={cs.art} />
-              <div className="foot">人教版 · 互动实验</div>
+              <div className="foot">{book.edition === 'shanghai' ? '上海版' : '人教版'} · 互动实验</div>
             </div>
           </div>
         </div>
@@ -50,14 +56,18 @@ function BookItem({ book, picked, leaving, resume, onPick }: { book: Book; picke
   );
 }
 
-export function Library() {
+export function Library({ edition }: { edition: Edition }) {
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [progress] = useState(readProgress);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  const rows = useMemo(() => [books.filter((b) => b.subject === 'physics'), books.filter((b) => b.subject === 'chemistry')], []);
+  const rows = useMemo(() => {
+    const shelf = books.filter((b) => b.edition === edition);
+    return [shelf.filter((b) => b.subject === 'physics'), shelf.filter((b) => b.subject === 'chemistry')];
+  }, [edition]);
+  const current = EDITIONS.find((x) => x.id === edition) ?? EDITIONS[0];
 
   const pick = (book: Book, el: HTMLElement) => {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -90,8 +100,15 @@ export function Library() {
       </header>
       <section className="lib-hero">
         <h1>从书页走进实验室</h1>
-        <p>人教版初中物理与化学 · 互动实验馆</p>
+        <p>{current.hero}</p>
         <div className="rule" />
+        <nav className="edition-tabs" aria-label="教材版本">
+          {EDITIONS.map((x) => (
+            <a key={x.id} href={x.id === 'shanghai' ? '#/shanghai' : '#/'} className={x.id === edition ? 'on' : undefined} aria-current={x.id === edition ? 'page' : undefined}>
+              <b>{x.label}</b><small>{x.note}</small>
+            </a>
+          ))}
+        </nav>
       </section>
       <section className="shelves" aria-label="教材书架">
         {rows.map((row, ri) => (

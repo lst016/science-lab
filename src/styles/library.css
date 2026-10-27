@@ -135,3 +135,13 @@
   .book-caption { width: calc(var(--bw) + 8px); }
   .book-slot::before { content: ''; position: absolute; left: -16px; right: -16px; top: calc(var(--bh) - 2px); height: 56px; border-radius: 3px; background: linear-gradient(180deg, #d9b17c, #a87444); box-shadow: 0 8px 14px rgba(80, 50, 20, 0.25); z-index: -1; }
 }
+
+/* 版本切换：人教版 / 上海版，像两张夹在书架前的书签 */
+.edition-tabs { display: inline-flex; gap: 0; margin-top: 14px; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: rgba(255, 250, 236, 0.7); }
+.edition-tabs a { display: flex; align-items: baseline; gap: 6px; padding: 6px 16px; border-radius: 999px; color: var(--ink-2); text-decoration: none; font-family: var(--serif); transition: background 0.25s, color 0.25s; }
+.edition-tabs a b { font-size: 15px; letter-spacing: 0.12em; font-weight: 600; }
+.edition-tabs a small { font-family: var(--sans); font-size: 11px; color: var(--ink-3); }
+.edition-tabs a.on { background: #2b2118; color: #f6eddb; }
+.edition-tabs a.on small { color: rgba(246, 237, 219, 0.7); }
+.edition-tabs a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (max-width: 520px) { .edition-tabs a { padding: 6px 11px; } .edition-tabs a small { display: none; } }

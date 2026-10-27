@@ -139,7 +139,15 @@ test('食盐水稀释保持溶质质量，配液与稀释后的浓度分别为6%
  near(num(diluted,'stockMass')*.06,num(diluted,'dilutedMass')*.03);
 });
 
-const chemistry = all.filter(e=>e.bookId.startsWith('chemistry-'));
+// 人教版化学80项为独立审查基线；上海版条目复用其sceneVariant，下面单独核对。
+const chemistry = all.filter(e=>e.bookId.startsWith('chemistry-')&&!e.bookId.includes('-sh-'));
+test('上海版复用条目均有已登记模型，化学复用条目有审查记录',()=>{
+ for(const exp of all.filter(e=>e.bookId.includes('-sh-')&&e.implementationStatus!=='rig-pending')){
+  const o=simulate(exp,Object.fromEntries(exp.parameters.map(p=>[p.key,p.default])),10,emptyAction());
+  assert(!o.warnings.some(w=>w.includes('尚无专属模型')),exp.id+'复用了未登记的变体');
+  if(exp.bookId.startsWith('chemistry-'))assert(CHEMISTRY_MODEL_LIMITS[exp.sceneVariant],exp.id+'缺化学审查记录');
+ }
+});
 let chemistryMatrixCases = 0;
 test('化学80项均有独立审查记录，观察/记录/收集不触发首次反应',()=>{
  assert.equal(chemistry.length,80);

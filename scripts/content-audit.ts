@@ -1,13 +1,16 @@
 import { books } from '../src/data/books';
 import { SCENE_FAMILIES } from '../src/data/types';
 import fs from 'node:fs';
+import { SH_VARIANT_BY_NAME } from '../src/data/sh-variants';
 
 const failures: string[] = [];
 const warnings: string[] = [];
 const ids = new Set<string>();
-const expected = ['physics-8-1','physics-8-2','physics-9','chemistry-9-1','chemistry-9-2'];
+const expected = ['physics-8-1','physics-8-2','physics-9','chemistry-9-1','chemistry-9-2','physics-sh-8-1','physics-sh-8-2','physics-sh-9-1','chemistry-sh-8','chemistry-sh-9'];
 const assert = (ok: unknown, message: string) => { if (!ok) failures.push(message); };
-assert(books.length === 5, '书目应为5册');
+assert(books.length === expected.length, `书目应为${expected.length}册`);
+const byId = new Map(books.flatMap(b => b.experiments).map(e => [e.id, e]));
+const pending: string[] = [];
 for (const id of expected) assert(books.some(b => b.id === id), `缺少教材 ${id}`);
 const counts: Record<string, number> = {};
 const families: Record<string, number> = {};
@@ -25,6 +28,16 @@ for (const book of books) {
     assert(e.steps.length >= 2 && e.steps.every(x => x.trim().length > 3), `${e.id}步骤不完整`);
     assert(!!e.model.description && !!e.model.formula && !!e.model.limits, `${e.id}模型说明不完整`);
     if (!e.sourceVerified) warnings.push(`${e.id}来源未核实`);
+    assert(e.bookId.startsWith(book.subject + '-'), `${e.id}的书号前缀须与学科一致（装置路由依赖）`);
+    if (book.edition === 'shanghai') {
+      if (e.implementationStatus === 'rig-pending') pending.push(`${e.id} p${e.pdfPage} ${e.title}`);
+      else if (e.sceneVariant.startsWith('sh-')) assert(!e.reusedFrom && SH_VARIANT_BY_NAME.has(e.sceneVariant), `${e.id}上海版专属变体未登记`);
+      else {
+        const t = e.reusedFrom ? byId.get(e.reusedFrom) : undefined;
+        assert(t && t.bookId.startsWith(book.subject + '-') && !t.bookId.includes('-sh-'), `${e.id}复用来源无效或跨学科`);
+        assert(t && t.sceneVariant === e.sceneVariant && JSON.stringify(t.parameters) === JSON.stringify(e.parameters), `${e.id}与复用实验的装置/参数不一致`);
+      }
+    }
     const keys = new Set<string>();
     for (const p of e.parameters) {
       assert(!keys.has(p.key), `${e.id}重复参数${p.key}`); keys.add(p.key);
@@ -37,7 +50,7 @@ for (const book of books) {
     families[e.family] = (families[e.family] ?? 0) + 1;
   }
 }
-const report = { books: books.length, experiments: ids.size, counts, families, failures, warnings };
+const report = { books: books.length, experiments: ids.size, counts, families, shanghaiRigPending: pending, failures, warnings };
 console.log(JSON.stringify(report, null, 2));
 if (process.argv.includes('--report')) {
   fs.mkdirSync('artifacts', {recursive: true});

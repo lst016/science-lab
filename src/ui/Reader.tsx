@@ -70,7 +70,7 @@ function EmptyBook({ bookId }: { bookId: string }) {
         <h2>{book.title}</h2>
         <p>这一册的实验内容仍在逐页盘点中，目前没有可打开的实验条目。</p>
         <p className="note">{book.coverageNote}</p>
-        <button type="button" onClick={() => navigate({ name: 'library' })}>回到书库</button>
+        <button type="button" onClick={() => navigate({ name: 'library', edition: book?.edition })}>回到书库</button>
       </div>
     </div>
   );
@@ -277,7 +277,7 @@ function ReaderInner({ bookId, exps, target }: { bookId: string; exps: Experimen
         index={targetIndex}
         total={total}
         tocOpen={tocOpen}
-        onLibrary={() => navigate({ name: 'library' })}
+        onLibrary={() => navigate({ name: 'library', edition: book?.edition })}
         onToc={openToc}
         onPrev={prev}
         onNext={next}

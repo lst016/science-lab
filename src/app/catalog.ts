@@ -31,6 +31,11 @@ const COVERS: Record<string, CoverStyle> = {
   'physics-9': { color: '#b98b2f', dark: '#8a6620', caption: '热、电、磁与能量', tagline: '从生活走向未来', art: 'orbit' },
   'chemistry-9-1': { color: '#a64a3b', dark: '#7b3226', caption: '物质的构成与变化', tagline: '从微观认识世界', art: 'molecule' },
   'chemistry-9-2': { color: '#2f6e70', dark: '#1f4e50', caption: '物质的化学反应', tagline: '在变化中创造新物质', art: 'flask' },
+  'physics-sh-8-1': { color: '#5f7f73', dark: '#40594f', caption: '测量、声光与运动', tagline: '从测量开始认识世界', art: 'prism' },
+  'physics-sh-8-2': { color: '#4f6d8a', dark: '#354c63', caption: '压强、浮力与机械', tagline: '让看不见的力显形', art: 'circuit' },
+  'physics-sh-9-1': { color: '#a5803a', dark: '#785b23', caption: '内能、电路与电功率', tagline: '追踪能量的去向', art: 'orbit' },
+  'chemistry-sh-8': { color: '#9c5442', dark: '#70382a', caption: '空气、水与碳', tagline: '走进化学实验室', art: 'molecule' },
+  'chemistry-sh-9': { color: '#356f6a', dark: '#224f4b', caption: '溶液、酸碱盐与金属', tagline: '在变化中认识物质', art: 'flask' },
 };
 
 export function coverOf(book: Book): CoverStyle {

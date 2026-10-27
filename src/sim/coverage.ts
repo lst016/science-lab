@@ -1,4 +1,5 @@
 import { experiments } from '../data/books';
+import { SH_VARIANTS } from '../data/sh-variants';
 
 /** sceneVariant 一旦加入教材数据，必须在这里登记并提供具体模型分支。 */
 export const MODELED_SCENE_VARIANTS = new Set<string>([
@@ -187,6 +188,9 @@ export const MODELED_SCENE_VARIANTS = new Set<string>([
   'acid-base-properties-practical',
   'soil-ph-plant-growth',
 ]);
+
+// 上海版专属变体在 sh-variants-*.ts 登记，模型分支在 src/sim/sh-*.ts。
+for (const def of Object.values(SH_VARIANTS)) MODELED_SCENE_VARIANTS.add(def.variant);
 
 export function getSimulationCoverage() {
   const variants = [...new Set(experiments.map((e) => e.sceneVariant))].sort();
