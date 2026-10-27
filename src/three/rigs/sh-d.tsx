@@ -320,25 +320,76 @@ function AtomModels() {
 const io_sel = (i: number, m: number) => (i === m ? MAT.red : i < m ? MAT.brass : MAT.plastic);
 
 /* ---------- 7 硫酸铜与氢氧化钠反应前后质量 ---------- */
-// 悬浮絮状沉淀颗粒：确定性伪随机分布（x/z 在半径 0.26 内，fy 为液柱内相对高度）
+// 絮团贴图：50~80 个半透明径向渐变小点沿几条随机丝缕方向偏心堆叠，中心较浓、边缘松散；模块级惰性创建，所有实例共用
+let flocTex: THREE.CanvasTexture[] | null = null;
+function flocTextures() {
+  if (flocTex) return flocTex;
+  flocTex = [0, 1, 2, 3].map((k) => {
+    const rnd = (s: number) => { const v = Math.sin(k * 91.7 + s * 78.233) * 43758.5453; return v - Math.floor(v); };
+    const S = 128, cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const g = cv.getContext('2d')!;
+    const arms = [0, 1, 2].map((j) => rnd(200 + j) * Math.PI * 2);
+    const n = 50 + Math.floor(rnd(0) * 31);
+    for (let j = 0; j < n; j++) {
+      // d 为相对偏心距离：越靠外点越小越淡；一半点沿丝缕方向分布，其余随机散开
+      const d = Math.pow(rnd(j * 5 + 1), 0.85) * 0.36;
+      const ang = rnd(j * 5 + 2) < 0.55 ? arms[j % 3] + (rnd(j * 5 + 3) - 0.5) * 0.5 : rnd(j * 5 + 3) * Math.PI * 2;
+      const x = S / 2 + Math.cos(ang) * d * S, y = S / 2 + Math.sin(ang) * d * S;
+      const r = S * (0.05 + rnd(j * 5 + 4) * 0.08) * (1 - d * 1.1);
+      const a = 0.78 * (1 - d / 0.4) * (0.6 + rnd(j * 5 + 5) * 0.4);
+      const grd = g.createRadialGradient(x, y, 0, x, y, r);
+      grd.addColorStop(0, 'rgba(35,105,205,' + a.toFixed(3) + ')');
+      grd.addColorStop(1, 'rgba(35,105,205,0)');
+      g.fillStyle = grd;
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    }
+    const t = new THREE.CanvasTexture(cv);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  });
+  return flocTex;
+}
+// 悬浮絮团：确定性伪随机分布（x/z 在半径 0.26 内，fy 为液柱内相对高度，w/h 为非等比尺寸，rs 为贴图转速）
 const FLOCS = Array.from({ length: 24 }, (_, i) => {
   const rnd = (s: number) => { const v = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return v - Math.floor(v); };
   const a = rnd(1) * Math.PI * 2, rr = Math.sqrt(rnd(2)) * 0.26;
-  return { x: Math.cos(a) * rr, z: Math.sin(a) * rr, fy: rnd(3), r: 0.035 + rnd(4) * 0.015, ph: rnd(5) * Math.PI * 2, sp: 0.02 + rnd(6) * 0.02 };
+  return { x: Math.cos(a) * rr, z: Math.sin(a) * rr, fy: rnd(3), w: 0.18 + rnd(4) * 0.12, h: 0.13 + rnd(7) * 0.08, ph: rnd(5) * Math.PI * 2, sp: 0.02 + rnd(6) * 0.02, rs: (rnd(8) - 0.5) * 0.4, tex: i % 4 };
+});
+// 杯底沉积层的大絮团
+const BED = Array.from({ length: 8 }, (_, i) => {
+  const rnd = (s: number) => { const v = Math.sin(i * 39.346 + s * 11.135) * 43758.5453; return v - Math.floor(v); };
+  const a = (i / 8 + rnd(1) * 0.1) * Math.PI * 2, rr = 0.06 + rnd(2) * 0.14;
+  return { x: Math.cos(a) * rr, z: Math.sin(a) * rr, y: 0.03 + rnd(3) * 0.05, w: 0.25 + rnd(4) * 0.05, h: 0.1 + rnd(5) * 0.04, ph: rnd(6) * Math.PI * 2, rs: (rnd(7) - 0.5) * 0.12, tex: (i + 1) % 4 };
 });
 function MassConservation() {
   const hA = (io: RigIO) => io.p('cuso4', 5) / 10 * 0.62, hB = (io: RigIO) => io.p('naoh', 5) / 10 * 0.62;
   const k = (io: RigIO) => Math.sin(Math.PI * clamp(io.s('pour', 0), 0, 1));
   const toHex = (a: string, b: string, t: number) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), clamp(t, 0, 1)).getHexString();
   const levelB = (io: RigIO) => hB(io) + hA(io) * clamp(io.s('pour', 0), 0, 1);
-  // Lambert 不经过 InkScene 的纸面混色和描边；设为透明并提高 renderOrder，画在半透明液体之后，蓝色沉淀才不被冲淡
-  const floc = useMat(() => new THREE.MeshLambertMaterial({ color: '#1f63cc', transparent: true, opacity: 0.95 }));
-  const settled = useMat(() => new THREE.MeshLambertMaterial({ color: '#1c56b4', transparent: true, opacity: 0.95 }));
+  // Sprite / Lambert 不经过 InkScene 的纸面混色和描边；透明且提高 renderOrder，画在半透明液体之后，蓝色沉淀才不被冲淡
+  const settled = useMat(() => new THREE.MeshLambertMaterial({ color: '#3d7fd0', transparent: true, opacity: 0.55, depthWrite: false }));
+  const spriteMats = useMemo(() => {
+    const tex = flocTextures();
+    const make = (q: { tex: number }) => new THREE.SpriteMaterial({ map: tex[q.tex], color: '#ffffff', transparent: true, opacity: 0.85, depthWrite: false });
+    return { flocs: FLOCS.map(make), bed: BED.map(make) };
+  }, []);
+  useEffect(() => () => { [...spriteMats.flocs, ...spriteMats.bed].forEach((m) => m.dispose()); }, [spriteMats]);
   const flocs = useRef<THREE.Group>(null);
+  const bed = useRef<THREE.Group>(null);
   const pile = useRef<THREE.Mesh>(null);
   useRig((io) => {
     const a = io.damp('pptSettle', io.s('precipitate', 0), 1.5);
-    if (pile.current) { pile.current.visible = a > 0.02; pile.current.scale.set(0.29, 0.13 * clamp(a, 0.05, 1), 0.29); }
+    if (pile.current) { pile.current.visible = a > 0.02; pile.current.scale.set(0.29, 0.08 * clamp(a, 0.05, 1), 0.29); }
+    const b = bed.current;
+    if (b) {
+      const nb = Math.round(clamp(a, 0, 1) * BED.length);
+      b.visible = a > 0.02;
+      b.children.forEach((c, i) => {
+        c.visible = i < nb;
+        if (c.visible) spriteMats.bed[i].rotation = BED[i].ph + io.t * BED[i].rs;
+      });
+    }
     const g = flocs.current;
     if (!g) return;
     const ppt = clamp(io.s('precipitate', 0), 0, 1), l = levelB(io), n = Math.round(ppt * FLOCS.length);
@@ -347,9 +398,10 @@ function MassConservation() {
       const q = FLOCS[i];
       c.visible = i < n;
       if (!c.visible) return;
-      // 缓慢下沉，沉到底后回到液面附近；水平方向轻微漂动
+      // 缓慢下沉，沉到底后回到液面附近；水平方向轻微漂动；贴图各自缓慢转动
       const f = ((q.fy - io.t * q.sp) % 1 + 1) % 1;
       c.position.set(q.x + Math.sin(io.t * 0.7 + q.ph) * 0.02, 0.06 + f * (l - 0.1), q.z + Math.cos(io.t * 0.6 + q.ph) * 0.02);
+      spriteMats.flocs[i].rotation = q.ph + io.t * q.rs;
     });
   });
   return <group>
@@ -365,12 +417,15 @@ function MassConservation() {
     </Mv>
     {/* 烧杯 B（氢氧化钠）：生成蓝色沉淀 */}
     <Vessel kind="beaker" p={[0.65, 0.35, 0]} r={0.36} h={0.85} />
-    {/* 悬浊液略带浅蓝；剩余 Cu²⁺ 越多越蓝 */}
-    <Liquid p={[0.65, 0.38, 0]} r={0.33} level={levelB} color={(io) => io.s('pour', 0) > 0.02 ? toHex('#d2e8f4', '#7fb6e4', Math.max(io.s('blueness', 0), io.s('precipitate', 0) * 0.3)) : 'clear'} />
-    {/* 沉在杯底的絮状沉淀：半球 */}
+    {/* 悬浊液呈浅蓝；剩余 Cu²⁺ 越多越蓝 */}
+    <Liquid p={[0.65, 0.38, 0]} r={0.33} level={levelB} color={(io) => io.s('pour', 0) > 0.02 ? toHex('#b7d8f2', '#5c9ddc', Math.max(io.s('blueness', 0), io.s('precipitate', 0) * 0.55)) : 'clear'} />
+    {/* 杯底沉积：浅薄半透明半球 + 松软的大絮团 */}
     <mesh ref={pile} position={[0.65, 0.39, 0]} material={settled} visible={false} renderOrder={6}><sphereGeometry args={[1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} /></mesh>
+    <group ref={bed} position={[0.65, 0.38, 0]} visible={false}>
+      {BED.map((q, i) => <sprite key={i} material={spriteMats.bed[i]} position={[q.x, q.y, q.z]} scale={[q.w, q.h, 1]} visible={false} renderOrder={6} />)}
+    </group>
     <group ref={flocs} position={[0.65, 0.38, 0]} visible={false}>
-      {FLOCS.map((q, i) => <mesh key={i} material={floc} visible={false} renderOrder={6}><sphereGeometry args={[q.r * 1.4, 10, 8]} /></mesh>)}
+      {FLOCS.map((q, i) => <sprite key={i} material={spriteMats.flocs[i]} scale={[q.w, q.h, 1]} visible={false} renderOrder={6} />)}
     </group>
     <Label text="硫酸铜溶液" p={[-1.5, 1.35, 0]} size={0.2} />
     <Label text="NaOH 溶液" p={[1.6, 1.35, 0]} size={0.2} />
